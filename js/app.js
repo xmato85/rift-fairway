@@ -101,11 +101,12 @@
       return '<div class="screen gz"><div class="scroll" style="padding:20px">' +
         '<div class="row"><p style="font-size:22px;font-weight:700;color:#1F3F8F">GOLFZON</p><button class="chip" style="background:#E3E8DF;color:#1B2620" data-a="logout">로그아웃</button></div>' +
         '<p style="font-size:18px;font-weight:700">' + esc(S.member.nickname) + '님, 오늘도 굿샷!</p>' +
-        '<div style="height:150px;border-radius:16px;background:linear-gradient(135deg,#2A1F5C,#13251C);color:#F3F5EE;padding:16px;display:flex;flex-direction:column;justify-content:flex-end"><p style="font-family:Black Han Sans;font-size:24px">균열의 페어웨이</p><p style="font-size:13px;opacity:.8">스크린 라운드가 레이드가 되는 방치형 RPG</p></div>' +
+        '<div style="height:150px;border-radius:16px;background:linear-gradient(#0000 30%,#000c),url(' + asset('webtoon_01.jpg') + ') center 62%/cover,#2A1F5C;color:#F3F5EE;padding:16px;display:flex;flex-direction:column;justify-content:flex-end"><p style="font-family:Black Han Sans;font-size:24px">균열의 페어웨이</p><p style="font-size:13px;opacity:.8">스크린 라운드가 레이드가 되는 방치형 RPG</p></div>' +
         '<div class="launcher">' + apps.map(function (a) {
-          return a === '[게임]' ? '<div class="game" data-a="enterGame"><i></i><b style="color:#6A4BD8">게임</b></div>' : '<div><i></i>' + a + '</div>';
+          return a === '[게임]' ? '<div class="game" data-a="enterGame"><i style="background:url(' + asset('icon_game.png') + ') center/cover"></i><b style="color:#6A4BD8">게임</b></div>' : '<div><i></i>' + a + '</div>';
         }).join('') + '</div>' +
         '<p class="sub" style="color:#4A5650">추천탭 아이콘 [게임]을 누르면 게임이 열립니다</p>' +
+        '<button class="btn" data-a="launcherScreen" style="background:#1F3F8F">스크린로그인</button>' +
         '</div></div>';
     },
 
@@ -113,22 +114,22 @@
     intro: function () {
       var n = esc(S.member.nickname);
       var cuts = [
-        ['webtoon_01.png', 'linear-gradient(#0B1712,#2A1F5C)', ['균열의 페어웨이']],
-        ['webtoon_02.png', 'linear-gradient(#13251C,#2B4A3A)', [n + '님, 오늘도 스크린 앞에 섰습니다.', '"이 퍼트만 넣으면…"']],
-        ['webtoon_07.png', 'linear-gradient(#2B4A3A,#6A4BD8)', ['"안녕! 나는 캐디 요정 피노야."', '"균열 너머 이 세계의 코스는 몬스터에게 점령당했어."']],
-        ['webtoon_09.png', 'linear-gradient(#6A4BD8,#13251C)', ['"네 명의 너와 함께, 코스를 되찾으러 가자!"']]
+        ['webtoon_01.jpg', 'linear-gradient(#0B1712,#2A1F5C)', ['균열의 페어웨이']],
+        ['webtoon_02.jpg', 'linear-gradient(#13251C,#2B4A3A)', [n + '님, 오늘도 스크린 앞에 섰습니다.', '"이 퍼트만 넣으면…"']],
+        ['webtoon_07.jpg', 'linear-gradient(#2B4A3A,#6A4BD8)', ['"안녕! 나는 캐디 요정 피노야."', '"균열 너머 이 세계의 코스는 몬스터에게 점령당했어."']],
+        ['webtoon_09.jpg', 'linear-gradient(#6A4BD8,#13251C)', ['"네 명의 너와 함께, 코스를 되찾으러 가자!"']]
       ];
       return '<div class="screen" style="position:relative"><button class="skip" data-a="introDone">건너뛰기 ›</button><div class="webtoon" data-scroll="intro">' +
         cuts.map(function (c, i) {
           return '<section class="cut' + (i === 0 ? ' in' : '') + '" style="background-image:url(' + asset(c[0]) + '),' + c[1] + '">' +
-            (i === 0 ? '<h1 class="title" style="font-size:40px;text-align:center;margin-bottom:auto;margin-top:120px">균열의 페어웨이</h1>' : c[2].map(function (t) { return '<p>' + t + '</p>'; }).join('')) + '</section>';
+            (i === 0 ? '<h1 class="title" style="font-size:40px;text-align:center">균열의 페어웨이</h1><p style="text-align:center;align-self:center">스크린 라운드가 레이드가 되는 곳</p>' : c[2].map(function (t) { return '<p>' + t + '</p>'; }).join('')) + '</section>';
         }).join('') +
         '<div style="padding:20px"><button class="btn purple" data-a="introDone">모험 시작</button></div></div></div>';
     },
 
     /* GM-01 사냥터 지역 지도 */
     map: function () {
-      var pos = { METRO: [16, 18], GANGWON: [55, 10], CHUNGCHEONG: [12, 36], JEOLLA: [10, 56], GYEONGSANG: [52, 46], JEJU: [18, 78], OVERSEAS: [56, 70], VIRTUAL: [48, 86] };
+      var pos = { METRO: [24, 14], GANGWON: [68, 12], CHUNGCHEONG: [22, 30], JEOLLA: [22, 47], GYEONGSANG: [72, 36], JEJU: [21, 70], OVERSEAS: [74, 61], VIRTUAL: [52, 86] };
       var cp = cpOf(mainJob());
       var pins = M.regions.map(function (r) {
         var open = M.courses.some(function (c) { return c.regionId === r.id && Engine.canEnterCourse(M, cp, c); });
@@ -137,7 +138,7 @@
       }).join('');
       return gameScreen('map',
         '<button class="btn gold" data-a="region" data-v="REC" data-coach="rec">지금 사냥 가능한 코스 보기</button>' +
-        '<div class="map" style="background-image:url(' + asset('map_world.png') + '),radial-gradient(circle at 30% 30%,#24503B,#15301F 70%);background-size:cover">' + pins + '</div>' +
+        '<div class="map" style="background-image:url(' + asset('map_world.jpg') + '),radial-gradient(circle at 30% 30%,#24503B,#15301F 70%)">' + pins + '</div>' +
         huntBar());
     },
 
@@ -366,6 +367,7 @@
   var hiddenTaps = [];
   var A = {
     home: function () { go('launcher'); },
+    launcherScreen: function () { if (S.member.intro_seen !== 'Y') { go('intro'); return; } A.dgLoginOpen(); },
     tab: function (d) { go(d.v === 'map' && S.hunt && view.name === 'hunt' ? 'map' : d.v); },
     logout: function () { Api.logout(); S = null; go('login'); },
     enterGame: function () { go(S.member.intro_seen === 'Y' ? (S.hunt ? 'hunt' : 'map') : 'intro'); },
@@ -509,6 +511,361 @@
   }, true);
   // 사냥 진행 표시 갱신(서버 요청 없이 화면에서 계산)
   setInterval(function () { if (!popup && (view.name === 'hunt' || view.name === 'map') && S && S.hunt) render(); }, 15000);
+
+  // ================= 던전 (DG-01 ~ DG-07, CM-02) =================
+  // 레이드 진행·결과 계산은 서버(roundSync)가 확정하고, 화면은 다음 결과 시각에 맞춰 동기화한다.
+  var D = { code: '', fails: 0, lockUntil: 0, guests: [], job: null, round: null, result: null, lastSeen: 0, hitUntil: 0, pollTimer: null, chests: [], openState: null, scoreMode: 'golf', busy: false };
+  var SKILL_TEXT = {
+    SHIELD: function (p) { return '보호막 · 모든 피해 ' + (p.WAR ? '15' : '30') + '% 감소' + (p.WAR ? ' (전사 방패)' : ''); },
+    MAGIC_BARRIER: function () { return '마법 방어막 · 마법 피해 50% 감소(도적 25%)'; },
+    PHYS_BARRIER: function () { return '물리 방어막 · 물리 피해 50% 감소(도적 25%)'; },
+    REGEN: function (p) { return p.ROG ? '재생 · 도적의 해독으로 무효' : '재생 · 보스 HP 5% 회복'; },
+    THORNS: function () { return '가시 갑옷 · 기준보다 나쁜 결과 피해 50% 감소'; },
+    WEAKNESS: function (p) { return '약점 노출 · 기준보다 좋은 결과 피해 ×' + (p.ARC ? '2.5 (궁수 저격)' : '2'); },
+    FOG: function () { return '안개 · 피해 ±20% 무작위'; },
+    PAR3_DUEL: function () { return '파3 결투 · 파3에서 파 이하면 피해 ×1.5'; }
+  };
+  var RESULT_SHORT = { '-3': '알바트로스', '-2': '이글', '-1': '버디', '0': '파', '1': '보기', '2': '더블', '3': '트리플', '4': '쿼드', 'DOUBLE_PAR': '양파' };
+  function dgSave(id) { try { if (id) localStorage.setItem('rf_round_' + S.member.member_id, id); else localStorage.removeItem('rf_round_' + S.member.member_id); } catch (e) {} }
+  function dgSaved() { try { return localStorage.getItem('rf_round_' + S.member.member_id); } catch (e) { return null; } }
+  function partyJobs(ps) { var o = {}; ps.forEach(function (p) { o[p.job_id] = true; }); return o; }
+  function dgScreen(body, opts) {
+    opts = opts || {};
+    return '<div class="screen dg">' + (opts.top || topbar()) + '<div class="scroll">' + body + '</div>' + (opts.foot || '') + (opts.tabs === false ? '' : tabs('dungeon')) + '</div>';
+  }
+  function bossImg(id, hit) { return asset(id + (hit ? '_hit' : '_idle') + '.png'); }
+
+  Object.assign(SCREENS, {
+    /* 던전 탭 진입: 진행 중 라운드가 있으면 이어서, 없으면 DG-01 */
+    dungeon: function () {
+      return dgScreen('<div class="card"><b>던전 · 파티 레이드</b><p class="sub">스크린에 표시된 번호로 스크린로그인하면 동반자와 함께 지역 보스 레이드가 시작돼요.</p></div>' +
+        '<button class="btn purple" data-a="dgLoginOpen">스크린로그인</button>' +
+        (S.chests.length ? '<button class="btn ghost" data-a="itemTab" data-v="chest">보관 중인 상자 ' + S.chests.length + '개 보기</button>' : '') +
+        '<p class="small">프로토타입: 스크린 번호 111111 · 동반자는 게스트 계정으로 추가</p>');
+    },
+
+    /* DG-01 스크린로그인 */
+    dgLogin: function () {
+      var wait = Math.max(0, Math.ceil((D.lockUntil - Date.now()) / 1000));
+      var boxes = ''; for (var i = 0; i < 6; i++) boxes += '<p class="pinbox' + (i === D.code.length ? ' on' : '') + '">' + esc(D.code[i] || '') + '</p>';
+      var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'clr'].map(function (k) {
+        return '<button class="key" data-a="dgKey" data-v="' + k + '"' + (wait ? ' disabled' : '') + '>' + (k === 'del' ? '⌫' : k === 'clr' ? '지움' : k) + '</button>';
+      }).join('');
+      return '<div class="screen sl"><div class="sl-top"><button data-a="tab" data-v="dungeon">‹</button><b>스크린로그인</b><span></span></div>' +
+        '<div class="scroll" style="gap:16px"><p class="notice" style="background:#E6F0FA;color:#1B2620">스크린에 표시된 6자리 번호를 입력해 주세요</p>' +
+        '<div class="pins">' + boxes + '</div>' +
+        '<p class="err" style="text-align:center">' + (D.busy ? '연결 중…' : wait ? '잠시 후 다시 시도해 주세요 · ' + wait + '초' : esc(D.err || '')) + '</p>' +
+        '<div style="flex:1"></div><div class="keypad">' + keys + '</div></div></div>';
+    },
+
+    /* DG-02 입장 대기 */
+    dgLobby: function () {
+      var me = { nickname: S.member.nickname, job: D.job || mainJob(), cp: cpOf(D.job || mainJob()), grade: S.member.grade_code };
+      var list = [me].concat(D.guests.map(function (id) { var g = IX.guest[id]; return { guest: id, nickname: g.nickname, job: g.jobId, cp: g.cp, grade: g.gradeCode }; }));
+      var cards = list.map(function (p, i) {
+        return '<div class="card' + (i === 0 ? ' hl' : '') + '"><div class="row"><b>' + esc(p.nickname) + (i === 0 ? ' (나)' : '') + '</b><span class="badge" style="background:var(--card2)">' + esc(job(p.job).name) + '</span></div>' +
+          '<div class="row"><span class="sub">' + (i === 0 ? '' : '게스트 · ') + esc(p.grade) + ' · 전투력 ' + fmt(p.cp) + ' · ' + esc(job(p.job).role) + '</span>' +
+          (i === 0 ? '<button class="chip" data-a="dgJobSheet">캐릭터 변경</button>' : '<button class="chip" data-a="dgGuestDel" data-v="' + p.guest + '">삭제</button>') + '</div></div>';
+      }).join('');
+      var jobsIn = partyJobs(list.map(function (p) { return { job_id: p.job }; }));
+      var missing = JOBS.filter(function (j) { return !jobsIn[j]; }).map(function (j) { return job(j).role; });
+      return dgScreen('<div class="row"><b style="font-size:18px">입장 대기 · ' + list.length + '/6명</b><button class="chip" data-a="dgClose">화면 닫기</button></div>' +
+        cards + (list.length < 6 ? '<button class="btn ghost" data-a="dgGuestAdd">+ 게스트 추가</button>' : '') +
+        '<p class="small">직업 구성 보너스: 서로 다른 직업 ' + Object.keys(jobsIn).length + '개' + (missing.length ? ' · 파티에 없는 역할: ' + missing.join(', ') : ' · 4직업 모두 참여') + '</p>' +
+        '<div style="flex:1"></div><button class="btn" data-a="dgNext"' + (D.busy ? ' disabled' : '') + '>' + (D.busy ? '레이드 준비 중…' : '다음 (참가자 확인)') + '</button>' +
+        '<button class="btn danger" data-a="dgLeave">레이드 나가기</button>');
+    },
+
+    /* DG-03 레이드 준비 */
+    dgReady: function () {
+      var r = D.round, zone = M.diffZones.filter(function (z) { return z.zone === r.zone; })[0];
+      var rs = r.room_settings || {};
+      return dgScreen('<b style="font-size:20px">레이드 준비</b>' +
+        '<div class="bossbox"><img src="' + bossImg(r.boss.id) + '" alt="" onerror="this.remove()"><div class="bossname">' + esc(r.boss.name) + '</div></div>' +
+        '<p class="sub" style="text-align:center">"' + esc(r.boss.line) + '"</p>' +
+        '<div class="card"><div class="row"><b>' + esc(r.course.name) + '</b><span class="sub">18홀 · PAR ' + r.course.par.reduce(function (a, b) { return a + b; }, 0) + '</span></div>' +
+        '<div class="row"><span>보스 HP</span><b style="color:var(--gold)">' + fmt(r.boss.hp_max) + '</b></div></div>' +
+        '<div class="card"><div class="row"><span>보스 난이도</span><b style="color:var(--gold)">' + r.zone + ' · ' + esc(zone.bossRank) + '</b></div>' +
+        '<div class="row"><span>획득 가능 최고 보상</span><b class="g' + zone.maxRewardGrade + '"><span class="gname">' + GRADE_NAME[zone.maxRewardGrade] + ' 상자</span></b></div>' +
+        '<details><summary class="small">난이도 상세 보기</summary><p class="small">난이도 점수 ' + r.diff_score + '점 · ' + Object.keys(rs).map(function (k) { return k + ' ' + rs[k]; }).join(' · ') + '</p></details></div>' +
+        '<div class="card"><b>참가 ' + r.participants.length + '명 · 구성 보너스 +' + Math.round(r.job_bonus * 100) + '%</b><p class="sub">' + r.participants.map(function (p) { return esc(p.nickname) + '(' + job(p.job_id).name + ')'; }).join(' · ') + '</p>' +
+        '<p class="small">보스 스킬: 1·4·7·10·13·16번 홀마다 무작위 발동 · 자동치기 1인 홀당 ' + Math.round(r.seconds_per_result / 60 * 10) / 10 + '분</p></div>' +
+        '<div style="flex:1"></div><button class="btn purple" data-a="dgStart"' + (D.busy ? ' disabled' : '') + '>' + (D.busy ? '시작 중…' : '레이드 시작') + '</button><p class="small" style="text-align:center">시작 후에는 참가자·캐릭터를 바꿀 수 없어요</p>');
+    },
+
+    /* DG-04 레이드 플레이 */
+    dgRaid: function () {
+      var r = D.round; if (!r) return SCREENS.dungeon();
+      var n = r.participants.length, idx = r.confirmed, hole = Math.min(18, Math.floor(idx / n) + 1);
+      var par = r.course.par[hole - 1], next = r.participants[idx % n];
+      var pj = partyJobs(r.participants), skill = Engine.skillAtHole(r.skill_schedule, hole);
+      var since = r.started_at ? Date.parse(r.started_at) : now();
+      var nextAt = since + (idx + 1) * r.seconds_per_result * 1000, secLeft = Math.max(0, Math.ceil((nextAt - now()) / 1000));
+      var hpPct = Math.max(0, r.boss_hp_left / r.boss.hp_max * 100), hit = Date.now() < D.hitUntil;
+      var mine = r.results.filter(function (x) { return x.slot === 0; }), last = mine[mine.length - 1];
+      var holeRes = r.results.filter(function (x) { return x.hole === (idx % n === 0 && idx > 0 ? hole - 1 : hole); });
+      var spNow = r.sp[0] || 0, pending = r.sp_pending && r.sp_pending[0];
+      var nextOwn = Math.ceil(idx / n) * n, applyHole = nextOwn / n + 1;
+      var spBtn = r.finished ? '' : pending
+        ? '<button class="btn ghost" disabled>특수공격 ' + applyHole + '홀 적용 예약됨</button>'
+        : spNow >= 100 ? '<button class="btn purple" data-a="dgSp">특수공격 사용 가능 · 피해 1.2~2배</button>'
+          : '<button class="btn ghost" disabled>특수공격 SP ' + spNow + '/100</button>';
+      var party = r.participants.map(function (p) {
+        var x = holeRes.filter(function (h) { return h.slot === p.slot; })[0];
+        return '<div class="prow"><span>' + esc(p.nickname) + (p.slot === 0 ? ' (나)' : '') + ' · ' + job(p.job_id).name + '</span>' +
+          (x ? '<b>' + esc(x.result) + ' ' + fmt(x.damage) + (x.sp_used ? ' ×' + x.sp_mult : '') + '</b>' : '<span class="small">' + (!r.finished && next === p ? '결과 대기 중' : '-') + '</span>') +
+          '<div class="bar sp" style="height:4px;grid-column:1/3"><i style="width:' + (r.sp[p.slot] || 0) + '%"></i></div></div>';
+      }).join('');
+      var head = r.finished ? '<b>18홀 종료</b>' : '<b>' + hole + 'H · PAR ' + par + '</b><span class="sub">' + esc(next.nickname) + '님 결과 대기 중 · ' + secLeft + '초</span>';
+      return dgScreen(
+        '<div class="row">' + head + '</div>' +
+        '<div class="bossbox raid' + (hit ? ' hit' : '') + '"><img src="' + bossImg(r.boss.id, hit) + '" alt="" onerror="this.remove()"><div class="bossname">' + esc(r.boss.name) + '</div>' + (D.floatDmg && hit ? '<div class="dmgfloat">-' + fmt(D.floatDmg) + '</div>' : '') + '</div>' +
+        '<div class="card" style="background:#2A1A14"><div class="row"><span>HP</span><b>' + fmt(r.boss_hp_left) + ' / ' + fmt(r.boss.hp_max) + (r.killed_at ? ' · ' + r.killed_at + 'H 처치!' : '') + '</b></div><div class="bar hp"><i style="width:' + hpPct + '%"></i></div>' +
+        (skill ? '<p style="color:#9CC7EE;font-size:13px">' + SKILL_TEXT[skill](pj) + ' · ' + (3 - ((hole - 1) % 3) - 1) + '홀 남음</p>' : '') + '</div>' +
+        (last ? '<button class="card hl" style="text-align:left" data-a="dgCalc" data-v="' + last.index + '"><div class="row"><b style="font-size:18px">내 결과 · ' + last.hole + 'H ' + esc(last.result) + '</b><span class="small">계산 근거 ›</span></div><b style="font-size:22px;color:var(--gold)">피해 ' + fmt(last.damage) + (last.sp_used ? ' (SP ×' + last.sp_mult + ')' : '') + '</b></button>' : '<div class="card"><p class="sub">내 첫 결과를 기다리는 중이에요</p></div>') +
+        '<div class="card" style="gap:8px">' + party + '</div>',
+        { foot: '<div class="dgfoot">' + spBtn + '<div class="row" style="gap:8px"><button class="btn ghost" data-a="dgScore">스코어카드</button>' +
+          (r.finished ? '<button class="btn gold" data-a="dgFinish">결과 보기</button>' : '') + '</div></div>', tabs: false });
+    },
+
+    /* DG-06 라운드 결과·보상 */
+    dgResult: function () {
+      var x = D.result || {}, r = D.round;
+      if (x.aborted) return dgScreen('<div class="card"><b>라운드 중단</b><p class="sub">' + esc(x.message) + '</p></div><button class="btn" data-a="dgExit">던전 나가기</button>');
+      var g = x.grade;
+      var body = '<b style="font-size:20px">라운드 결과</b>' +
+        '<div class="card"><div class="row"><b style="color:' + (x.killed_at ? 'var(--ok)' : 'var(--bad)') + '">' + (x.killed_at ? '보스 처치 · ' + x.killed_at + 'H' : '보스 생존') + '</b><span>' + esc(r.boss.name) + '</span></div>' +
+        '<p class="sub">파티 피해 ' + fmt(x.total_damage) + ' · 데미지 비율 ' + Math.round(x.ratio * 100) + '%</p></div>';
+      if (x.limit_reached) {
+        body += '<div class="card"><b>오늘 상자 보상 횟수(' + x.daily_limit + '회)를 모두 받았어요</b><p class="sub">상자 대신 ' + esc(x.grade_name) + ' 등급 골드의 50%인 ' + fmt(x.gold) + 'G를 받았어요</p></div>';
+      } else {
+        body += '<div class="card g' + g + '" style="border:2px solid var(--gc)"><div class="row" style="justify-content:flex-start"><img class="chesticon" src="' + asset('chest_' + g + '_closed.png') + '" alt="" onerror="this.remove()"><div><b class="gname" style="font-size:18px">' + esc(x.grade_name) + ' 상자 1개</b>' +
+          '<p class="sub">' + (x.capped ? '데미지 비율로는 ' + esc(x.grade_by_ratio) + '이지만 난이도 ' + x.zone + ' 구간 최고 등급이 적용됐어요' : '데미지 비율 ' + Math.round(x.ratio * 100) + '%로 결정') + '</p>' +
+          '<p class="small">오늘 상자 보상 ' + x.today_count + '/' + x.daily_limit + '회</p></div></div></div>' +
+          '<button class="btn purple" data-a="dgOpenChests">받은 상자 열기</button>' +
+          (D.bonusDone ? '<button class="btn ghost" disabled>1+1 추가 상자 지급 완료</button>' : '<button class="btn ghost" data-a="dgBuy">1+1 추가 상자 (시연용 결제)</button>') +
+          '<button class="small" data-a="probs" style="padding:8px">확률 보기</button>';
+      }
+      body += '<button class="btn ghost" data-a="dgScore">스코어카드</button><button class="btn ghost" data-a="dgExit">던전 나가기</button>';
+      return dgScreen(body);
+    },
+
+    /* DG-07 보물상자 개봉 */
+    dgChest: function () {
+      var c = D.chests[0]; if (!c) return SCREENS.dgResult();
+      var st = D.openState || 'closed', res = D.opened;
+      var body = '<div class="row"><b style="font-size:20px">보물상자 개봉</b><span class="small">남은 상자 ' + D.chests.length + '개</span></div>' +
+        '<div class="chestbox' + (st === 'opening' ? ' shake' : '') + '"><img src="' + asset('chest_' + c.reward_grade + (st === 'done' ? '_open' : '_closed') + '.png') + '" alt=""></div>' +
+        '<p class="g' + c.reward_grade + '" style="text-align:center"><b class="gname">' + GRADE_NAME[c.reward_grade] + ' 상자' + (c.is_bonus === 'Y' ? ' · 1+1' : '') + '</b></p>';
+      if (st === 'closed') body += '<button class="btn purple" data-a="dgOpen">탭해서 열기</button>';
+      else if (st === 'opening') body += '<p class="sub" style="text-align:center">여는 중…</p>';
+      else if (res) {
+        var con = res.contents;
+        body += '<div class="card"><p>골드 ' + fmt(con.gold) + '</p><div class="grid">' + Object.keys(con.materials).map(function (id) {
+          return '<div class="cell g' + IX.material[id].tier + '">' + matIcon(id) + '<span>' + esc(IX.material[id].name) + ' ×' + con.materials[id] + '</span></div>'; }).join('') + '</div>' +
+          res.items.map(function (x) { var it = IX.item[x.item_id]; return '<div class="row g' + it.grade + '" style="justify-content:flex-start;border:2px solid var(--gc);border-radius:12px;padding:8px">' + itemIcon(x.item_id) + '<b class="gname">' + GRADE_NAME[it.grade] + ' · ' + esc(it.name) + '</b></div>'; }).join('') + '</div>' +
+          (D.chests.length > 1 ? '<button class="btn purple" data-a="dgNextChest">다음 상자 열기</button><button class="btn ghost" data-a="dgLater">나중에 열기</button>'
+            : '<button class="btn" data-a="dgItems">아이템 확인</button><button class="btn ghost" data-a="dgLater">결과 화면으로</button>');
+      }
+      return dgScreen(body);
+    }
+  });
+
+  Object.assign(POPUPS, {
+    /* DG-02 캐릭터 변경 시트 */
+    dgJobs: function () {
+      var others = partyJobs(D.guests.map(function (id) { return { job_id: IX.guest[id].jobId }; }));
+      return '<div class="overlay"><div class="sheet"><b>참여할 내 캐릭터</b>' + JOBS.map(function (j) {
+        var cp = cpOf(j);
+        return '<button class="row card" style="background:' + ((D.job || mainJob()) === j ? '#E8E2FB' : '#EEF2EA') + ';color:#1B2620;text-align:left" data-a="dgPickJob" data-v="' + j + '"><div style="flex:1"><b>' + job(j).name + ' · 전투력 ' + fmt(cp) + '</b><p class="sub">역할 ' + esc(job(j).role) + ' · ' + esc(job(j).roleEffect) + '</p></div>' +
+          (others[j] ? '<span class="small">파티에 있음</span>' : '<span style="color:#2E8B57;font-size:12px;font-weight:700">파티에 없음</span>') + '</button>';
+      }).join('') + '<button class="btn ghost" data-a="close">닫기</button></div></div>';
+    },
+    /* DG-04 계산 근거(R-38) */
+    dgCalc: function (p) {
+      var r = D.round, x = r.results.filter(function (y) { return y.index === Number(p.idx); })[0], me = r.participants[x.slot];
+      var sk = x.boss_skill_id ? IX.bossSkill[x.boss_skill_id].name : '없음';
+      return '<div class="overlay center"><div class="sheet"><b>계산 근거 · ' + x.hole + 'H</b>' +
+        '<p>' + esc(x.result) + '(' + esc(me.grade_code) + ' 기준 ' + Math.round(x.ratio * 100) + '%) × 기준 데미지 ' + fmt(x.base_damage) + ' × 보스 스킬(' + esc(sk) + ') ' + x.skill_coef + ' × 구성 보너스 ' + (1 + x.job_bonus) + (x.sp_used ? ' × SP ' + x.sp_mult : '') + ' = <b>' + fmt(x.damage) + '</b></p>' +
+        '<p class="sub">타수 ' + x.strokes + ' (PAR ' + x.par + ') · SP ' + x.sp_before + ' → ' + x.sp_after + ' · 모의 스코어(자동치기)</p><button class="btn ghost" data-a="close">닫기</button></div></div>';
+    },
+    /* DG-05 스코어카드 */
+    dgScore: function () {
+      var r = D.round, n = r.participants.length, mode = D.scoreMode;
+      var cell = function (slot, h) {
+        var x = r.results.filter(function (y) { return y.slot === slot && y.hole === h; })[0];
+        if (!x) return '<td class="small">·</td>';
+        if (mode === 'golf') { var d = x.strokes - x.par; return '<td style="color:' + (d < 0 ? '#2D6FE0' : d > 0 ? '#D64545' : '#1B2620') + '">' + (d > 0 ? '+' + d : d) + '</td>'; }
+        return '<td>' + fmt(x.damage) + '</td>';
+      };
+      var tot = function (slot) {
+        var xs = r.results.filter(function (y) { return y.slot === slot; });
+        if (mode === 'golf') { var d = xs.reduce(function (a, y) { return a + y.strokes - y.par; }, 0); return d > 0 ? '+' + d : String(d); }
+        return fmt(xs.reduce(function (a, y) { return a + y.damage; }, 0));
+      };
+      var hs = []; for (var h = 1; h <= 18; h++) hs.push(h);
+      return '<div class="overlay"><div class="sheet"><div class="row"><b>스코어카드</b><div class="chips"><button class="chip' + (mode === 'golf' ? ' on' : '') + '" data-a="dgScoreMode" data-v="golf">골프 점수</button><button class="chip' + (mode === 'dmg' ? ' on' : '') + '" data-a="dgScoreMode" data-v="dmg">파티 피해</button></div></div>' +
+        '<div class="sc"><table><tr><th class="fix">이름</th>' + hs.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '<th>합계</th></tr>' +
+        '<tr><th class="fix small">PAR</th>' + hs.map(function (h) { return '<td class="small">' + r.course.par[h - 1] + '</td>'; }).join('') + '<td></td></tr>' +
+        r.participants.map(function (p) { return '<tr><th class="fix">' + esc(p.nickname) + '</th>' + hs.map(function (h) { return cell(p.slot, h); }).join('') + '<td><b>' + tot(p.slot) + '</b></td></tr>'; }).join('') +
+        '</table></div><p class="small">파티 피해 합계 ' + fmt(r.total_damage) + ' · 이름 열 고정, 옆으로 밀어서 보기</p><button class="btn ghost" data-a="close">닫기</button></div></div>';
+    },
+    /* CM-02 모의 결제 */
+    dgBuy: function (p) {
+      var st = p.state || 'confirm';
+      if (st === 'processing') return '<div class="overlay center"><div class="sheet"><b>결제 처리 중…</b><p class="sub">잠시만 기다려 주세요</p></div></div>';
+      if (st === 'fail') return '<div class="overlay center"><div class="sheet"><b>결제를 처리하지 못했어요</b><p class="sub">시연용 결제 실패 상황입니다.</p><button class="btn" data-a="dgBuyGo" data-v="success">다시 시도</button><button class="btn ghost" data-a="close">닫기</button></div></div>';
+      var g = D.result.grade;
+      return '<div class="overlay center"><div class="sheet"><b style="font-size:18px">보물상자 1+1</b>' +
+        '<div class="row g' + g + '" style="justify-content:flex-start"><img class="chesticon" src="' + asset('chest_' + g + '_closed.png') + '" alt=""><div><b class="gname">' + GRADE_NAME[g] + ' 상자 1개 추가</b><p class="sub">가격 1,100원 · 라운드당 1회</p></div></div>' +
+        '<p class="notice">실제 결제되지 않는 시연용입니다</p>' +
+        '<button class="btn purple" data-a="dgBuyGo" data-v="success">구매</button><button class="btn ghost" data-a="dgBuyGo" data-v="cancel">취소</button>' +
+        '<button class="small" data-a="dgBuyGo" data-v="fail" style="padding:6px">결제 실패 상황 보기(시연)</button></div></div>';
+    }
+  });
+
+  // ---- 던전 동작 ----
+  function dgPoll() {
+    clearTimeout(D.pollTimer);
+    if (view.name !== 'dgRaid' || !D.round || D.round.finished) return;
+    var r = D.round, since = r.started_at ? Date.parse(r.started_at) : now();
+    var nextAt = since + (r.confirmed + 1) * r.seconds_per_result * 1000;
+    var wait = Math.max(1500, Math.min(15000, nextAt - now() + 1200));
+    D.pollTimer = setTimeout(function () { dgSync({}); }, wait);
+  }
+  function dgSync(p) {
+    if (!D.round) return Promise.resolve();
+    return Api.call('roundSync', Object.assign({ round_id: D.round.round_id }, p), { read: true }).then(function (res) {
+      if (!res.ok) { toast(res.error.message); dgPoll(); return res; }
+      var r = res.data.round;
+      if (r.server_time) offset = Date.parse(r.server_time) - Date.now();
+      var fresh = r.results.slice(D.round.results ? D.round.results.length : 0);
+      if (fresh.length && D.round.results) { D.hitUntil = Date.now() + 700; D.floatDmg = fresh.reduce(function (a, x) { return a + x.damage; }, 0); setTimeout(function () { if (view.name === 'dgRaid' && !popup) render(); }, 750); }
+      D.round = r;
+      if (view.name === 'dgRaid' && !popup) render();
+      dgPoll();
+      return res;
+    });
+  }
+  function dgResume(id) {
+    D.round = { round_id: id };
+    return Api.call('roundSync', { round_id: id }, { read: true }).then(function (res) {
+      if (!res.ok) { dgSave(null); D.round = null; return false; }
+      var r = res.data.round; D.round = r;
+      if (r.status === 'READY') { go('dgReady'); return true; }
+      if (r.status === 'ACTIVE') { go('dgRaid'); dgPoll(); return true; }
+      dgSave(null); D.round = null; return false;
+    });
+  }
+  // 1초마다 남은 시간 표시만 갱신
+  setInterval(function () { if (view.name === 'dgRaid' && !popup && D.round && !D.round.finished) { var el = root.querySelector('.dg .row .sub'); if (el) { var r = D.round, n = r.participants.length; var since = Date.parse(r.started_at); var left = Math.max(0, Math.ceil((since + (r.confirmed + 1) * r.seconds_per_result * 1000 - now()) / 1000)); el.textContent = r.participants[r.confirmed % n].nickname + '님 결과 대기 중 · ' + left + '초'; } } }, 1000);
+
+  Object.assign(A, {
+    dgLoginOpen: function () {
+      var saved = dgSaved();
+      if (saved) { toast('진행 중인 레이드를 불러오는 중…'); dgResume(saved).then(function (ok) { if (!ok) { D.code = ''; D.err = ''; go('dgLogin'); } }); return; }
+      D.code = ''; D.err = ''; go('dgLogin');
+    },
+    dgKey: function (d) {
+      if (D.busy || Date.now() < D.lockUntil) return;
+      if (d.v === 'del') D.code = D.code.slice(0, -1); else if (d.v === 'clr') D.code = ''; else if (D.code.length < 6) D.code += d.v;
+      D.err = ''; render();
+      if (D.code.length === 6) {
+        D.busy = true; render();
+        setTimeout(function () { // 프로토타입: 111111만 성공(실연동 시 스크린 번호 확인 API)
+          D.busy = false;
+          if (D.code === '111111') { D.fails = 0; D.guests = []; D.job = mainJob(); D.round = null; toast('스마트로그인 완료'); go('dgLobby'); }
+          else { D.fails++; D.code = ''; D.err = '번호를 다시 확인해 주세요'; if (D.fails >= 5) { D.lockUntil = Date.now() + 60000; D.fails = 0; var t = setInterval(function () { if (Date.now() >= D.lockUntil) clearInterval(t); if (view.name === 'dgLogin') render(); }, 1000); } render(); }
+        }, 600);
+      }
+    },
+    dgJobSheet: function () { popup = { type: 'dgJobs' }; render(); },
+    dgPickJob: function (d) { D.job = d.v; popup = null; render(); },
+    dgGuestAdd: function () {
+      var used = {}; D.guests.forEach(function (g) { used[g] = 1; });
+      var pool = M.guests.filter(function (g) { return g.use && !used[g.id]; });
+      if (!pool.length || D.guests.length >= 5) return;
+      D.guests.push(pool[Math.floor(Math.random() * pool.length)].id); render();
+    },
+    dgGuestDel: function (d) { D.guests = D.guests.filter(function (g) { return g !== d.v; }); render(); },
+    dgClose: function () { go('map'); toast('입장 대기는 던전 탭에서 다시 이어갈 수 있어요'); },
+    dgLeave: function () { popup = { type: 'confirm', title: '레이드에서 나갈까요?', text: '입장 대기 중인 파티가 해산됩니다.', yes: '나가기', run: function () { D.guests = []; go('dungeon'); } }; render(); },
+    dgNext: function () {
+      D.busy = true; render();
+      act('roundCreate', { guest_ids: D.guests, job_id: D.job || mainJob() }).then(function (res) {
+        D.busy = false;
+        if (!res.ok) { toast(res.error.message); render(); return; }
+        D.round = res.data.round; dgSave(D.round.round_id); go('dgReady');
+      });
+    },
+    dgStart: function () {
+      D.busy = true; render();
+      Api.call('roundSync', { round_id: D.round.round_id, start: true }, { read: true }).then(function (res) {
+        D.busy = false;
+        if (!res.ok) { toast(res.error.message); render(); return; }
+        D.round = res.data.round; D.round.results = D.round.results || []; go('dgRaid'); dgPoll();
+      });
+    },
+    dgSp: function (d, el) {
+      el.disabled = true; el.textContent = '사용 중…';
+      Api.call('spUse', { round_id: D.round.round_id }, { read: true }).then(function (res) {
+        if (!res.ok) { toast(res.error.message); render(); return; }
+        toast(res.data.reserved ? res.data.apply_hole + '홀 결과에 적용 예약!' : res.data.apply_hole + '홀 내 결과에 적용!');
+        dgSync({});
+      });
+    },
+    dgCalc: function (d) { popup = { type: 'dgCalc', idx: d.v }; render(); },
+    dgScore: function () { popup = { type: 'dgScore' }; render(); },
+    dgScoreMode: function (d) { D.scoreMode = d.v; render(); },
+    dgFinish: function (d, el) {
+      if (el) { el.disabled = true; el.textContent = '결과 계산 중…'; }
+      act('roundFinish', { round_id: D.round.round_id }).then(function (res) {
+        if (!res.ok) { toast(res.error.message); render(); return; }
+        D.result = res.data.result; D.bonusDone = false; dgSave(null);
+        if (res.data.wallet) S.wallet = res.data.wallet;
+        D.chests = res.data.result.chest ? [res.data.result.chest] : [];
+        if (res.data.result.chest) S.chests.push(res.data.result.chest);
+        clearTimeout(D.pollTimer); go('dgResult');
+      });
+    },
+    dgOpenChests: function () { D.openState = 'closed'; D.opened = null; if (!D.chests.length) { toast('열 상자가 없어요'); return; } go('dgChest'); },
+    dgOpen: function () {
+      var c = D.chests[0]; D.openState = 'opening'; render();
+      var started = Date.now();
+      act('chestOpen', { chest_id: c.chest_id }).then(function (res) {
+        var wait = Math.max(0, 1500 - (Date.now() - started));
+        setTimeout(function () {
+          if (!res.ok) { D.openState = 'closed'; toast(res.error.message); render(); return; }
+          var con = res.data.contents; S.wallet = res.data.wallet;
+          Object.keys(con.materials).forEach(function (k) { S.materials[k] = (S.materials[k] || 0) + con.materials[k]; });
+          S.items = S.items.concat(res.data.items); S.chests = S.chests.filter(function (x) { return x.chest_id !== c.chest_id; });
+          D.opened = res.data; D.openState = 'done'; render();
+        }, wait);
+      });
+    },
+    dgNextChest: function () { D.chests.shift(); D.openState = 'closed'; D.opened = null; render(); },
+    dgLater: function () { if (D.openState === 'done') D.chests.shift(); D.openState = 'closed'; D.opened = null; go('dgResult'); },
+    dgItems: function () { D.chests.shift(); go('items', { tab: 'equip' }); },
+    dgBuy: function () { popup = { type: 'dgBuy', state: 'confirm' }; render(); },
+    dgBuyGo: function (d) {
+      var outcome = d.v;
+      if (outcome !== 'cancel') { popup = { type: 'dgBuy', state: 'processing' }; render(); } else { popup = null; render(); }
+      act('purchaseMock', { round_id: D.round.round_id, outcome: outcome }).then(function (res) {
+        if (!res.ok) { popup = null; toast(res.error.message); render(); return; }
+        if (outcome === 'cancel') return;
+        if (res.data.status === 'FAIL') { popup = { type: 'dgBuy', state: 'fail' }; render(); return; }
+        D.bonusDone = true; S.chests.push(res.data.chest); D.chests.push(res.data.chest); popup = null; toast('1+1 추가 상자 지급 완료'); render();
+      });
+    },
+    dgExit: function () { D.round = null; D.result = null; D.chests = []; go('dungeon'); }
+  });
+  // 레이드 화면 숨김 영역 3연속 터치 = 남은 홀 즉시 완료
+  var _hidden = A.hidden;
+  A.hidden = function () {
+    if (view.name !== 'dgRaid') return _hidden();
+    var t = Date.now(); D.taps = (D.taps || []).filter(function (x) { return t - x < 1800; }); D.taps.push(t);
+    if (D.taps.length >= 3 && D.round && !D.round.finished) { D.taps = []; toast('남은 홀을 바로 완료합니다'); dgSync({ advance: 'finish' }); }
+  };
 
   // ---------------- 시작 ----------------
   fetch(APP_CONFIG.MASTER_URL).then(function (r) { return r.json(); }).then(function (m) {

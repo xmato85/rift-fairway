@@ -112,3 +112,42 @@ h1, h2, h3, p { margin: 0; }
 .coach .head { display: flex; gap: 10px; align-items: center; }
 .hero.big { width: 80px; height: 120px; animation: none; }
 .hero.big:has(img) { width: 150px; height: 160px; }
+/* 웹툰 컷: 이미지 비율(2:3) 그대로, 대사는 위쪽 25% 영역 */
+.cut { min-height: 0; aspect-ratio: 2 / 3; justify-content: flex-start; padding: 28px 18px; background-size: cover; background-repeat: no-repeat; }
+.cut .title { margin-top: 18px !important; text-shadow: 0 3px 12px #000c; }
+/* ---- 던전 ---- */
+.sl { background: linear-gradient(180deg, #4A8FD6 0%, #9CC7EE 45%, #EEF3F7 100%); color: var(--ink); }
+.sl-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; color: #fff; font-size: 17px; }
+.sl-top button { color: #fff; font-size: 22px; width: 40px; text-align: left; }
+.sl-top span { width: 40px; }
+.pins { display: flex; gap: 6px; }
+.pinbox { flex: 1; height: 52px; border-radius: 8px; background: #F3F8FD; color: #2D6FE0; font-size: 26px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid transparent; }
+.pinbox.on { border-color: #2D6FE0; }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: #D6DCE2; border-radius: 14px; padding: 10px; }
+.key { background: #FBFCF8; border-radius: 10px; min-height: 52px; font-size: 22px; color: #1B2620; }
+.key:disabled { opacity: .4; }
+.bossbox { position: relative; height: 210px; border-radius: 18px; background: radial-gradient(circle at 50% 70%, #3A2A22, #1A1210 75%); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.bossbox img { height: 100%; width: auto; max-width: 100%; object-fit: contain; }
+.bossbox .bossname { position: absolute; left: 12px; bottom: 8px; font-weight: 700; color: #F0A070; text-shadow: 0 2px 6px #000; }
+.bossbox.raid { height: 190px; }
+.bossbox.hit img { animation: bosshit .5s; }
+@keyframes bosshit { 20% { transform: translateX(8px) rotate(2deg); filter: brightness(1.8); } 60% { transform: translateX(-4px); } }
+.dmgfloat { position: absolute; right: 18px; top: 18px; font-size: 26px; font-weight: 800; color: #FFD27A; text-shadow: 0 2px 6px #000; animation: up .7s ease-out; }
+@keyframes up { from { transform: translateY(16px); opacity: 0; } }
+.prow { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 13px; align-items: center; }
+.dgfoot { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; background: #10201A; }
+.sc { overflow-x: auto; border: 1px solid #DDE3DA; border-radius: 10px; }
+.sc table { border-collapse: separate; border-spacing: 0; font-size: 13px; white-space: nowrap; }
+.sc th, .sc td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #EEF2EA; }
+.sc .fix { position: sticky; left: 0; background: #F8FAF5; text-align: left; z-index: 1; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+.chesticon { width: 64px; height: 64px; object-fit: contain; flex: none; }
+.chestbox { height: 220px; display: flex; align-items: center; justify-content: center; }
+.chestbox img { height: 100%; object-fit: contain; }
+.chestbox.shake img { animation: shake .25s infinite; filter: drop-shadow(0 0 16px #E2C46A); }
+@keyframes shake { 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+details summary { cursor: pointer; }
+.toast { bottom: auto; top: 60px; }
+/* 대륙 지도: 이미지 비율(2:3) 그대로, 핀은 지역 중심 기준 */
+.map { flex: none; min-height: 0; aspect-ratio: 2 / 3; background-size: cover; background-position: center; }
+.pin { transform: translate(-50%, -50%); white-space: nowrap; background: #13251CDD; border: 1px solid #ffffff55; font-weight: 700; box-shadow: 0 2px 8px #0008; }
+.pin.lock { background: #2A1F5CDD; }
