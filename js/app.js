@@ -51,6 +51,7 @@
   }
   function setSave(save) {
     S = save; offset = Date.parse(save.server_time) - Date.now();
+    if (S.member.tutorial_step !== 'DONE') { try { var t = localStorage.getItem('rf_tut_' + S.member.member_id); if (t && Number(t) > Number(S.member.tutorial_step)) S.member.tutorial_step = t; } catch (e) {} }
   }
   Api.state.onSave = function (s) { saveState = s; var el = root.querySelector('.save'); if (el) { el.textContent = saveLabel(); el.className = 'save' + (s === 'error' ? ' err' : ''); } };
   Api.state.onExpired = function (msg) { popup = { type: 'expired', msg: msg }; render(); };
@@ -354,6 +355,8 @@
     if (!S || S.member.tutorial_step === 'DONE') return;
     if (step !== 'DONE' && Number(step) <= Number(S.member.tutorial_step)) return;
     S.member.tutorial_step = String(step);
+    // 중간 단계는 기기에만 기록(서버 대기 없음), 완료만 서버에 저장해 보상 지급
+    if (step !== 'DONE') { try { localStorage.setItem('rf_tut_' + S.member.member_id, String(step)); } catch (e) {} return; }
     act('progress', { tutorial_step: String(step) }).then(function (res) {
       if (res.ok && res.data.reward_gold) { S.wallet.gold += res.data.reward_gold; toast('튜토리얼 완료! 보상 골드 ' + res.data.reward_gold); }
     });
@@ -395,14 +398,17 @@
       });
     },
     equip: function (d) {
+      // 화면에 먼저 반영하고 서버 확정은 뒤에서(실패 시 다시 불러옴)
+      var x = S.items.filter(function (i) { return i.inv_item_id === d.v; })[0], it = IX.item[x.item_id];
+      S.items.forEach(function (i) { var t = IX.item[i.item_id]; if (i.equipped_job_id === it.jobId && t.partId === it.partId) i.equipped_job_id = ''; });
+      x.equipped_job_id = it.jobId;
+      var cp = cpOf(it.jobId), c = charOf(it.jobId); if (c) c.cp = cp;
+      popup = null; toast(job(it.jobId).name + ' 전투력 ' + fmt(cp) + '(으)로 상승!');
+      if (S.member.tutorial_step === '4') tutorialTo('DONE');
+      go('char', { job: it.jobId });
       act('equip', { inv_item_id: d.v }).then(function (res) {
-        if (!res.ok) { toast(res.error.message); return; }
-        var x = S.items.filter(function (i) { return i.inv_item_id === d.v; })[0], it = IX.item[x.item_id];
-        S.items.forEach(function (i) { var t = IX.item[i.item_id]; if (i.equipped_job_id === it.jobId && t.partId === it.partId) i.equipped_job_id = ''; });
-        x.equipped_job_id = it.jobId; S.characters = res.data.characters;
-        var c = charOf(it.jobId); popup = null; toast(job(it.jobId).name + ' 전투력 ' + fmt(c.cp) + '(으)로 상승!');
-        if (S.member.tutorial_step === '4') tutorialTo('DONE');
-        go('char', { job: it.jobId });
+        if (!res.ok) { toast(res.error.message); reload().then(render); return; }
+        S.characters = res.data.characters; if (view.name === 'char') render();
       });
     },
     unequip: function (d) {
@@ -452,10 +458,15 @@
     }
   };
   function startHunt(courseId) {
+    // 사냥 화면을 바로 보여주고, 서버가 정한 시작 시각으로 곧 맞춤
+    var tut = S.member.tutorial_step !== 'DONE';
+    S.hunt = { course_id: courseId, job_id: mainJob(), started_at: new Date(now()).toISOString(), tutorial: tut,
+      max_ticks: tut ? 6 : M.huntConst.maxTicks, tick_minutes: tut ? 1 : M.huntConst.tickMinutes, pending: true };
+    tutorialTo(2); go('hunt');
     act('huntStart', { course_id: courseId }).then(function (res) {
-      if (!res.ok) { toast(res.error.message); return; }
+      if (!res.ok) { S.hunt = null; toast(res.error.message); reload().then(function () { go('map'); }); return; }
       S.hunt = res.data.hunt; offset = Date.parse(res.data.hunt.server_time) - Date.now();
-      tutorialTo(2); go('hunt');
+      if (view.name === 'hunt' || view.name === 'map') render();
     });
   }
   function claim(skip, thenCourse) {
