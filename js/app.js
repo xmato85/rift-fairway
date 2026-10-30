@@ -244,7 +244,7 @@
         '<div class="chips">' + JOBS.map(function (x) { return '<button class="chip' + (x === j ? ' on' : '') + '" data-a="charJob" data-v="' + x + '">' + job(x).name + (x === mainJob() ? ' ★' : '') + '</button>'; }).join('') + '</div>' +
         '<div class="card"><div class="row"><b>' + (isMain ? '현재 대표: ' : '살펴보는 캐릭터: ') + esc(job(j).name) + '</b>' + (isMain ? '<span class="lbl-warn">★ 대표</span>' : '<button class="chip" data-a="setMain" data-v="' + j + '">대표로 설정</button>') + '</div>' +
         '<p class="sub">전투력 <b style="color:var(--text);font-size:18px">' + fmt(cp) + '</b> · 스킬 ' + esc(sk.name) + ' · 역할 ' + esc(job(j).role) + '</p></div>' +
-        '<div class="stage" style="height:170px"><div class="hero" style="width:80px;height:120px;background:#6A4BD8">' + img('char_' + JOB_FILE[j] + '.png') + '</div></div>' +
+        '<div class="stage" style="height:170px"><div class="hero big" style="background:#6A4BD8">' + img('char_' + JOB_FILE[j] + '.png') + '</div></div>' +
         '<b>장비 8부위</b><div class="grid">' + slots + '</div>' +
         '<b style="margin-top:8px">설정</b>' +
         '<button class="btn ghost" data-a="replayTutorial">튜토리얼 다시 보기</button>' +
@@ -348,7 +348,7 @@
   function tutorialCoach() {
     if (!S || !S.member || S.member.tutorial_step === 'DONE' || S.member.intro_seen !== 'Y') return '';
     var c = COACH[S.member.tutorial_step]; if (!c || c.screens.indexOf(view.name) < 0) return '';
-    return '<div class="coach"><p>' + c.text + '</p><div class="row"><button class="small" data-a="tutSkip">건너뛰기</button><span class="small">캐릭터 › 설정에서 다시 볼 수 있어요</span></div></div>';
+    return '<div class="coach"><div class="head"><img class="pino" src="' + asset('pino.png') + '" alt="" onerror="this.remove()"><p>' + c.text + '</p></div><div class="row"><button class="small" data-a="tutSkip">건너뛰기</button><span class="small">캐릭터 › 설정에서 다시 볼 수 있어요</span></div></div>';
   }
   function tutorialTo(step) {
     if (!S || S.member.tutorial_step === 'DONE') return;

@@ -1,7 +1,7 @@
 {
  "meta": {
-  "version": "249e8ba4",
-  "generatedAt": "2026-10-30T09:03:26",
+  "version": "496b9047",
+  "generatedAt": "2026-10-30T12:04:02",
   "source": "골프존 AX CHALLENGE_게임 기획 (Google Sheets)"
  },
  "huntTiers": [
@@ -10879,7 +10879,7 @@
   },
   {
    "grade": 5,
-   "name": "레전드",
+   "name": "전설",
    "minRatio": 1,
    "qtyMin": 16,
    "qtyMax": 22,

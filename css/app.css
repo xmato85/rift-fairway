@@ -105,3 +105,10 @@ h1, h2, h3, p { margin: 0; }
 .icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .hero img { width: 100%; height: 100%; object-fit: contain; }
 .scroll > * { flex-shrink: 0; }
+.icon img ~ span { display: none; }
+.hero:has(img) { background: none !important; width: 70px; height: 96px; }
+.stage .hero:has(img) img { filter: drop-shadow(0 4px 4px #0006); }
+.coach .pino { width: 52px; height: 52px; flex: none; }
+.coach .head { display: flex; gap: 10px; align-items: center; }
+.hero.big { width: 80px; height: 120px; animation: none; }
+.hero.big:has(img) { width: 150px; height: 160px; }
