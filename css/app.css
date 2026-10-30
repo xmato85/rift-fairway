@@ -1,0 +1,107 @@
+:root {
+  --bg: #13251C; --card: #1E3A2C; --card2: #2B4A3A; --line: #2F4A3D;
+  --text: #F3F5EE; --sub: #A9C2B3; --mute: #8FA898;
+  --gold: #E2C46A; --purple: #6A4BD8; --purple2: #9C86F0; --green: #2E8B57; --ok: #7FD49B; --bad: #E08A7A;
+  --g1: #9AA3A0; --g2: #5DBB7A; --g3: #4F8FE0; --g4: #9C6BEA; --g5: #F0A13A;
+  --light: #F3F5EE; --ink: #1B2620;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: #0B1712; font-family: 'IBM Plex Sans KR', system-ui, sans-serif; color: var(--text); }
+button { font: inherit; color: inherit; border: 0; cursor: pointer; background: none; }
+#app { position: relative; max-width: 420px; height: 100dvh; margin: 0 auto; background: var(--bg); overflow: hidden; display: flex; flex-direction: column; }
+.screen { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.scroll { flex: 1; overflow-y: auto; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+h1, h2, h3, p { margin: 0; }
+.title { font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 26px; }
+.sub { color: var(--sub); font-size: 13px; }
+.small { font-size: 12px; color: var(--mute); }
+
+/* 상단 바·하단 탭 */
+.topbar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); min-height: 52px; }
+.topbar .home { font-size: 20px; padding: 4px 8px; }
+.topbar .who { flex: 1; font-size: 14px; }
+.topbar .gold { color: var(--gold); font-weight: 700; font-size: 14px; }
+.save { font-size: 11px; color: var(--mute); min-width: 52px; text-align: right; }
+.save.err { color: var(--bad); }
+.hidden-zone { position: absolute; top: 0; right: 0; width: 64px; height: 64px; z-index: 30; }
+.tabs { display: flex; border-top: 1px solid var(--line); background: #10201A; padding-bottom: env(safe-area-inset-bottom); }
+.tabs button { flex: 1; padding: 12px 0; font-size: 13px; color: var(--mute); min-height: 48px; }
+.tabs button.on { color: var(--purple2); font-weight: 700; }
+.badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--purple); color: #fff; font-weight: 700; }
+
+/* 카드·버튼 */
+.card { background: var(--card); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.card.hl { border: 2px solid var(--gold); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.btn { min-height: 52px; border-radius: 12px; padding: 12px; font-weight: 700; font-size: 16px; background: var(--green); color: #fff; width: 100%; }
+.btn.purple { background: var(--purple); }
+.btn.gold { background: var(--gold); color: #13251C; }
+.btn.ghost { background: var(--card2); color: #CFE3D6; }
+.btn.danger { background: #5A2A24; color: #F3C1B8; }
+.btn:disabled { opacity: .45; }
+.chip { padding: 6px 12px; border-radius: 16px; background: var(--card2); color: #CFE3D6; font-size: 13px; white-space: nowrap; }
+.chip.on { background: var(--gold); color: #13251C; font-weight: 700; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.bar { height: 10px; background: var(--card2); border-radius: 5px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--gold); border-radius: 5px; transition: width .4s; }
+.bar.hp > i { background: #E06A5A; } .bar.sp > i { background: var(--purple2); }
+.lbl-ok { color: var(--ok); } .lbl-warn { color: var(--gold); } .lbl-bad { color: var(--bad); }
+
+/* 등급 테두리 */
+.g1 { --gc: var(--g1); } .g2 { --gc: var(--g2); } .g3 { --gc: var(--g3); } .g4 { --gc: var(--g4); } .g5 { --gc: var(--g5); }
+.icon { width: 56px; height: 56px; border-radius: 12px; border: 3px solid var(--gc, var(--line)); background: #173026 center/80% no-repeat; flex: none; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--sub); text-align: center; line-height: 1.1; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cell { background: var(--card); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; font-size: 12px; }
+.cell .icon { width: 52px; height: 52px; }
+.gname { color: var(--gc); font-weight: 700; }
+
+/* 지도 */
+.map { position: relative; flex: 1; min-height: 360px; border-radius: 18px; background: radial-gradient(circle at 30% 30%, #24503B, #15301F 70%); overflow: hidden; }
+.pin { position: absolute; padding: 6px 10px; border-radius: 12px; background: var(--card2); font-size: 13px; color: #CFE3D6; }
+.pin.lock { background: #2A1F5C; color: #CDBFFF; }
+
+/* 사냥 애니 */
+.stage { height: 200px; border-radius: 18px; background: linear-gradient(#1E3A2C, #2B4A3A); display: flex; align-items: flex-end; justify-content: center; gap: 12px; padding-bottom: 20px; position: relative; overflow: hidden; }
+.hero { width: 46px; height: 70px; border-radius: 10px 10px 6px 6px; animation: bob 1s ease-in-out infinite; background-size: cover; }
+.hero:nth-child(2) { animation-delay: .25s } .hero:nth-child(3) { animation-delay: .5s } .hero:nth-child(4) { animation-delay: .75s }
+@keyframes bob { 50% { transform: translateY(-8px); } }
+.mob { position: absolute; right: 18px; top: 30px; width: 54px; height: 44px; border-radius: 50%; background: #6B3A2A; animation: hit 1.2s infinite; }
+@keyframes hit { 40% { transform: translateX(4px); filter: brightness(1.6); } }
+
+/* 시트·팝업 */
+.overlay { position: absolute; inset: 0; background: rgba(5, 12, 9, .72); z-index: 40; display: flex; align-items: flex-end; }
+.overlay.center { align-items: center; padding: 16px; }
+.sheet { width: 100%; background: #F8FAF5; color: var(--ink); border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; max-height: 85%; overflow-y: auto; }
+.overlay.center .sheet { border-radius: 20px; }
+.sheet .sub { color: #4A5650; }
+.sheet .btn.ghost { background: #E3E8DF; color: var(--ink); }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 80px; background: #0B1712EE; border: 1px solid var(--line); color: var(--text); padding: 12px 14px; border-radius: 12px; z-index: 60; font-size: 14px; }
+
+/* 튜토리얼 말풍선 */
+.coach { background: #FBFCF8; color: var(--ink); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; border: 2px solid var(--purple2); flex: none; }
+.coach b { color: var(--purple); }
+.coach .row button { font-size: 13px; }
+
+/* 골프존앱 목업 */
+.gz { background: #FBFCF8; color: var(--ink); }
+.gz .scroll { gap: 14px; }
+.gz input { width: 100%; border: 0; border-bottom: 2px solid #C9D1C8; padding: 12px 2px; font: inherit; font-size: 16px; background: transparent; outline: none; }
+.gz input:focus { border-color: #2D6FE0; }
+.gz .btn { background: #2D6FE0; }
+.notice { background: #EEE9FD; color: #4B33B5; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.err { color: #D64545; font-size: 13px; min-height: 18px; }
+.launcher { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.launcher div { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: #4A5650; }
+.launcher i { width: 52px; height: 52px; border-radius: 14px; background: #E3E8DF; }
+.launcher .game i { background: linear-gradient(135deg, #6A4BD8, #E2C46A); box-shadow: 0 0 0 3px #6A4BD855; }
+
+/* 웹툰 */
+.webtoon { flex: 1; overflow-y: auto; background: #0B1712; }
+.cut { min-height: 520px; display: flex; flex-direction: column; justify-content: flex-end; padding: 24px 20px; gap: 10px; background-size: cover; background-position: center; }
+.cut p { background: #0009; padding: 10px 12px; border-radius: 10px; font-size: 16px; line-height: 1.5; opacity: 0; transform: translateY(10px); transition: all .6s; }
+.cut.in p { opacity: 1; transform: none; }
+.skip { position: absolute; top: 12px; right: 12px; z-index: 5; border: 1px solid var(--purple2); border-radius: 16px; padding: 6px 14px; background: #0007; font-size: 13px; }
+.icon { position: relative; overflow: hidden; }
+.icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.hero img { width: 100%; height: 100%; object-fit: contain; }
+.scroll > * { flex-shrink: 0; }
