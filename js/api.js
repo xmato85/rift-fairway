@@ -1,7 +1,7 @@
 /* 서버 통신: { action, request_id, session_token, save_version, payload } (R-44)
  * 재화가 바뀌는 요청은 저장 상태를 표시하고, 실패 시 같은 request_id로 3회까지 재시도(R-18, R-20) */
 var Api = (function () {
-  var S = { token: null, version: null, onSave: function () {}, onExpired: function () {} };
+  var S = { token: null, version: null, onSave: function () {}, onExpired: function () {}, onTime: function () {} };
   try { S.token = localStorage.getItem('rf_token'); } catch (e) {}
   function uuid() { return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)); }
   function post(body) {
@@ -17,6 +17,8 @@ var Api = (function () {
       tries++;
       return post(body).then(function (res) {
         if (res.save_version !== undefined) S.version = res.save_version;
+        var d = res.ok && res.data, st = d && (d.server_time || (d.round && d.round.server_time) || (d.hunt && d.hunt.server_time));
+        if (st) S.onTime(st); // 서버 시각 기준(사냥 틱·레이드 이벤트 표시)
         if (!res.ok && res.error) {
           if (res.error.code === 'SESSION_EXPIRED') { S.onExpired(res.error.message); }
           if (res.error.code === 'VERSION_CONFLICT' && res.error.save_version !== undefined) S.version = res.error.save_version;

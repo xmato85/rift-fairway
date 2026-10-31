@@ -2,7 +2,7 @@
 window.APP_CONFIG = {
   API_URL: location.hostname === 'localhost' || location.hostname === '127.0.0.1'
     ? '/api'
-    : 'https://script.google.com/macros/s/AKfycbzzLZAcYP9YMH52uFBrTLGi7SehLOl7QxOmHwnjSQQm7WGuZb-ibrxuEIkJXnq7YB0S/exec',
+    : 'https://script.google.com/macros/library/d/1FJla2FCbfCHi-9QVjHLHFScLL49wKsxoZsXCraXgvMkVDhcIZDs2wl9E/4',
   MASTER_URL: 'data/master.json',
   ASSET_DIR: 'assets/'
 };
