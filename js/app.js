@@ -57,6 +57,7 @@
     pendingWrites++;
     var run = function () {
       return Api.call(action, payload, opts).then(function (res) {
+        if (res.ok && action !== 'missionClaim') missionAt = 0; // 미션 진행이 바뀌었을 수 있음 → 다음 사냥터 화면에서 다시 조회
         if (!res.ok && res.error && res.error.code === 'VERSION_CONFLICT') { toast(res.error.message); return reload().then(function () { return res; }); }
         return res;
       });
@@ -276,24 +277,28 @@
     map: function () {
       var pos = { METRO: [24, 14], GANGWON: [68, 12], CHUNGCHEONG: [22, 30], JEOLLA: [22, 47], GYEONGSANG: [72, 36], JEJU: [21, 70], OVERSEAS: [74, 61], VIRTUAL: [52, 79] };
       var mj = mainJob(), cp = cpOf(mj), tot = 0, opn = 0;
+      setTimeout(function () { missionRefresh(false); }, 0);
       // 지역별 해금 코스 수 / 전체 코스 수(대표 캐릭터 전투력 기준) — 해금 니즈를 지도에서 바로 보여 줌(v0.5 보완)
       var pins = M.regions.map(function (r) {
         var list = M.courses.filter(function (c) { return c.regionId === r.id; });
         var n = list.filter(function (c) { return Engine.canEnterCourse(M, cp, c); }).length, all = list.length, p = pos[r.id];
         tot += all; opn += n;
-        return '<button class="pin' + (n ? '' : ' lock') + (n === all ? ' full' : '') + '" style="left:' + p[0] + '%;top:' + p[1] + '%" data-a="region" data-v="' + r.id + '">' +
+        var here = S.hunt && IX.course[S.hunt.course_id] && IX.course[S.hunt.course_id].regionId === r.id;
+        return '<button class="pin' + (n ? '' : ' lock') + (n === all ? ' full' : '') + (here ? ' hunting' : '') + '" style="left:' + p[0] + '%;top:' + p[1] + '%" data-a="' + (here ? 'openHunt' : 'region') + '" data-v="' + r.id + '">' +
+          (here ? '<em class="hunttag">사냥 중</em>' : '') +
           '<span class="pn">' + esc(r.name) + '</span><span class="pc"><b>' + n + '</b> / ' + all + '</span>' +
           '<i class="pbar"><i style="width:' + Math.round(n / Math.max(1, all) * 100) + '%"></i></i></button>';
       }).join('');
       var ns = nextStar(cp);
       return gameScreen('map',
         '<div class="row" style="gap:8px">' + goalCard() +
-        '<div class="sideicons"><button data-a="missions" aria-label="일일 미션">' + img('icon_mission.png') + '<span>미션</span></button>' +
+        '<div class="sideicons"><button data-a="missions" aria-label="일일 미션"' + (missionReady() ? ' class="ready"' : '') + '>' + img('icon_mission.png') + '<span>' + (missionReady() ? '받기' : '미션') + '</span>' +
+        (missionReady() ? '<b class="nbadge">' + missionReady() + '</b>' : '') + '</button>' +
         '<button data-a="rank" aria-label="랭킹">' + img('icon_rank.png') + '<span>랭킹</span></button></div></div>' +
-        '<button class="btn gold" data-a="region" data-v="REC" data-tut="rec">지금 사냥 가능한 코스 보기</button>' +
+        huntBar() +
         '<div class="map" style="background-image:url(' + asset('map_world.jpg') + '),radial-gradient(circle at 30% 30%,#24503B,#15301F 70%)">' +
         '<div class="maplegend"><b>' + esc(job(mj).name) + ' · 전투력 ' + fmt(cp) + ' 기준</b><span>해금 코스 <b>' + opn + '</b> / ' + tot + (ns ? ' · ' + fmt(ns.need) + ' 더 올리면 ' + ns.star + '성 해금' : '') + '</span></div>' + pins + '</div>' +
-        huntBar());
+        '<button class="btn gold" data-a="region" data-v="REC" data-tut="rec">지금 사냥 가능한 코스 보기</button>');
     },
 
     /* GM-02 코스 목록 (p.region: 지역ID|'REC', p.mat: 재료 획득처) */
@@ -346,7 +351,7 @@
 
     /* GM-05 제작 */
     craft: function (p) {
-      var j = p.job || mainJob(), filter = p.filter || 'can', mats = S.materials, w = S.wallet, tutWeapon = tutActive() && !TUT.replay && tutCur() === 4;
+      var j = p.job || mainJob(), filter = p.filter || 'all', mats = S.materials, w = S.wallet, tutWeapon = tutActive() && !TUT.replay && tutCur() === 4;
       var list = M.items.filter(function (it) { return it.jobId === j; }).map(function (it) {
         return { it: it, short: Engine.craftShortage(M, it.id, w, mats) };
       });
@@ -359,7 +364,7 @@
       var goal = S.member.goal_item_id;
       return gameScreen('craft',
         '<div class="chips">' + JOBS.map(function (x) { return '<button class="chip' + (x === j ? ' on' : '') + '" data-a="craftJob" data-v="' + x + '">' + job(x).name + '</button>'; }).join('') + '</div>' +
-        '<div class="chips"><button class="chip' + (filter === 'can' ? ' on' : '') + '" data-a="craftFilter" data-v="can">지금 만들 수 있는 것</button><button class="chip' + (filter === 'all' ? ' on' : '') + '" data-a="craftFilter" data-v="all">전체</button></div>' +
+        '<div class="chips"><button class="chip' + (filter === 'all' ? ' on' : '') + '" data-a="craftFilter" data-v="all">전체</button><button class="chip' + (filter === 'can' ? ' on' : '') + '" data-a="craftFilter" data-v="can">지금 만들 수 있는 것</button></div>' +
         (goal && IX.item[goal] ? '<button class="card goalline" data-a="craftDetail" data-v="' + goal + '"><span class="small">목표 장비</span><b>' + esc(IX.item[goal].name) + '</b><span class="small">›</span></button>' : '') +
         (filter === 'can' && !list.some(function (x) { return !x.short.length; }) ? '<p class="sub">지금 만들 수 있는 장비가 없어요. 사냥으로 재료를 모아 보세요.</p>' : '') +
         list.map(function (x) {
@@ -450,12 +455,34 @@
     return '<button class="card goal" data-a="goalCard" data-tut="goal"><span class="small" style="color:var(--gold)">다음 목표</span>' + head +
       '<span class="small">' + (rec ? '추천 제작 · ' + esc(rec.name) + ' (+' + fmt(cpGain(rec.id)) + ')' : '추천 제작 없음') + '</span></button>';
   }
+  /** 받을 수 있는 미션 보상 수(완료·미수령). 사냥터 화면이 보일 때 30초마다 뒤에서 갱신 */
+  function missionReady() {
+    var d = LAST.missions; if (!d || !d.missions) return 0;
+    return d.missions.filter(function (x) { return x.done && !x.claimed; }).length;
+  }
+  var missionAt = 0;
+  function missionRefresh(force) {
+    if (!S || (!force && Date.now() - missionAt < 30000)) return;
+    missionAt = Date.now();
+    Api.call('missions', {}, { read: true }).then(function (res) {
+      if (!res.ok || !S) return;
+      var before = missionReady(); LAST.missions = res.data;
+      if (popup && popup.type === 'missions') popup.data = res.data;
+      if (missionReady() !== before && (view.name === 'map' || (popup && popup.type === 'missions'))) render();
+    });
+  }
   function huntBar() {
     if (!S.hunt) return '';
-    var h = S.hunt, c = IX.course[h.course_id], full = huntFull(h), pct = full ? 100 : Math.min(100, (now() - Date.parse(h.started_at)) / huntMaxMs(h) * 100);
-    return '<button class="card" style="text-align:left;background:var(--card2)" data-a="openHunt"><div class="row"><b>' + esc(c.name) + '</b><span class="' + (full ? 'lbl-warn' : 'sub') + '">' + (full ? '가득 참 · 받으러 가기' : '보상 쌓이는 중') + '</span></div><div class="bar"><i style="width:' + pct + '%"></i></div></button>';
+    var h = S.hunt, c = IX.course[h.course_id], full = huntFull(h), el = Math.max(0, now() - Date.parse(h.started_at)), mx = huntMaxMs(h);
+    var pct = full ? 100 : Math.min(100, el / mx * 100), t = huntTicksNow(h), sub;
+    var hm = function (ms) { var m = Math.floor(ms / 60000); return Math.floor(m / 60) + ':' + ('0' + m % 60).slice(-2); };
+    if (h.tutorial) sub = full ? '체험 보상 준비 완료' : '체험 보상까지 ' + Math.max(0, Math.ceil((mx - el) / 1000)) + '초';
+    else if (full) sub = '8시간 가득 참 · 더 쌓이지 않아요';
+    else { var tm = h.tick_minutes * 60000; sub = '경과 ' + hm(el) + ' / ' + hm(mx) + ' · 보상 ' + t + '회 · 다음 보상까지 ' + Math.max(1, Math.ceil((tm - el % tm) / 60000)) + '분'; }
+    return '<button class="card huntnow' + (full ? ' full' : '') + '" data-a="openHunt"><div class="row"><span class="hn-l">진행 중인 사냥 · ' + '★'.repeat(c.star) + ' ' + esc(IX.region[c.regionId].name) + '</span>' +
+      '<span class="hn-go">' + (full ? '받으러 가기' : '보러 가기') + ' ›</span></div><b class="hn-name">' + esc(c.name) + '</b>' +
+      '<div class="bar"><i style="width:' + pct.toFixed(1) + '%"></i></div><span class="hn-sub">' + sub + '</span></button>';
   }
-
   // ---- 사냥 계산(표시용, 확정은 서버) ----
   function huntTicksNow(h) { return Engine.huntTicks(M, Date.parse(h.started_at), now(), h.tutorial); }
   function huntMaxMs(h) { return h.tutorial ? (h.trial_wait_seconds || M.tutorial.trialWaitSeconds) * 1000 : h.max_ticks * h.tick_minutes * 60000; }
@@ -708,6 +735,9 @@
     { sel: '[data-tut=spbtn]', text: ['SP가 100이 되면 [특수공격]!', '이번 홀 피니시 피해가 1.2~2배가 돼요'] }
   ];
   function coachSpec() {
+    // GZ-02 첫 진입 안내: ID/PW 로그인 후 골프존앱 메인에서 [게임] 탭으로 모험 시작(인트로를 아직 안 본 회원, v0.5 보완)
+    if (view.name === 'launcher') return S && S.member.intro_seen !== 'Y' && !TUT.gameHintOff && !popup
+      ? { sel: '.gzm-game', text: ['[게임] 탭을 눌러 보세요!', '균열의 페어웨이의 세계로 모험을 떠나 볼까요?'], face: 'pino_cheer', launch: true } : null;
     if (view.name === 'dgRaid') return D.coach !== null && D.coach !== undefined && !popup ? Object.assign({ raid: true }, RAID_COACH[D.coach]) : null;
     if (['map', 'courses', 'hunt', 'craft', 'items', 'char'].indexOf(view.name) < 0 || !tutActive()) return null;
     return tutSpec();
@@ -728,7 +758,8 @@
       '<div class="chole" style="left:' + r.x + 'px;top:' + r.y + 'px;width:' + r.w + 'px;height:' + r.h + 'px"></div>' : blk(0, 0, W, H);
     var below = !r || (H - (r.y + r.h)) > r.y;
     var pos = !r ? 'top:' + (H / 2 - 60) + 'px' : below ? 'top:' + (r.y + r.h + 10) + 'px' : 'bottom:' + (H - r.y + 10) + 'px';
-    var btns = sp.raid ? '<button class="small" data-a="coachClose">닫기</button><button class="chip on" data-a="coachNext">' + (D.coach < RAID_COACH.length - 1 ? '다음' : '확인') + '</button>'
+    var btns = sp.launch ? '<button class="small" data-a="gameHintOff">나중에</button><button class="chip on" data-a="enterGame">게임 탭으로</button>'
+      : sp.raid ? '<button class="small" data-a="coachClose">닫기</button><button class="chip on" data-a="coachNext">' + (D.coach < RAID_COACH.length - 1 ? '다음' : '확인') + '</button>'
       : sp.replay ? '<button class="small" data-a="tutReplayEnd">닫기</button><span class="small">' + tutCur() + '/6</span><button class="chip on" data-a="tutReplayNext">' + (tutCur() < 6 ? '다음' : '완료') + '</button>'
         : '<button class="small" data-a="tutSkip">건너뛰기</button><span class="small">' + tutCur() + '/6</span>' + (sp.ok ? '<button class="chip on" data-a="tutOk">' + sp.ok + '</button>' : '');
     html += '<div class="cbubble" style="' + pos + '"><div class="coachhead">' + face(sp.face || 'pino') + '<p>' + esc(sp.text[0]) + (sp.text[1] ? '<br>' + esc(sp.text[1]) : '') + '</p></div><div class="row">' + btns + '</div></div>';
@@ -778,6 +809,7 @@
   var hiddenTaps = [];
   var A = {
     home: function () { go('launcher'); },
+    gameHintOff: function () { TUT.gameHintOff = true; render(); },
     gzMy: function () { popup = { type: 'confirm', title: S.member.nickname + '님', text: '시연용 테스트 계정으로 로그인 중이에요. 로그아웃할까요?', yes: '로그아웃', no: '닫기', run: function () { A.logout(); } }; render(); },
     launcherScreen: function () { if (S.member.intro_seen !== 'Y') { go('intro'); return; } A.dgLoginOpen(); },
     tab: function (d) { go(d.v); },
@@ -1664,6 +1696,7 @@
       var btn = root.querySelector('[data-a=claim]'), html = claimButton();
       if (btn && btn.outerHTML !== html) { if (btn.disabled && html.indexOf('disabled') < 0) render(); else btn.outerHTML = html; }
     }
+    if (view.name === 'map' && S.hunt) { var hb = root.querySelector('.huntnow'), hh = huntBar(); if (hb && hb.outerHTML !== hh) hb.outerHTML = hh; }
     if (view.name === 'dgRaid' && D.sim) { var nl = document.getElementById('dgNext'); if (nl) nl.innerHTML = nextLabel(); }
     patchRings();
     dgFinishBackground();
