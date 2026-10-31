@@ -49,16 +49,30 @@
   function addMats(delta) { Object.keys(delta || {}).forEach(function (k) { S.materials[k] = (S.materials[k] || 0) + delta[k]; }); }
   function face(name) { return '<img class="pino" src="' + asset(name || 'pino') + '.png" alt="" onerror="this.remove()">'; }
 
-  // 쓰기 요청은 순서대로 하나씩(버전 충돌 방지)
-  var queue = Promise.resolve();
+  // 쓰기 요청은 순서대로 하나씩(버전 충돌 방지). 진행 표시만 바꾸는 요청(BG)은 줄 서지 않고 바로 보냄(v0.5 최적화)
+  var queue = Promise.resolve(), pendingWrites = 0, LAST = {};
+  var BG = { setMainJob: 1, progress: 1, tutorialStep: 1, setGoal: 1, raidGuideSeen: 1, logEvent: 1 };
   function act(action, payload, opts) {
+    if (BG[action]) return Api.call(action, payload, opts);
+    pendingWrites++;
     var run = function () {
       return Api.call(action, payload, opts).then(function (res) {
         if (!res.ok && res.error && res.error.code === 'VERSION_CONFLICT') { toast(res.error.message); return reload().then(function () { return res; }); }
         return res;
       });
     };
-    var pr = queue.then(run, run); queue = pr.then(function () {}, function () {}); return pr;
+    var pr = queue.then(run, run).then(function (r) { pendingWrites--; return r; }, function (e) { pendingWrites--; throw e; });
+    queue = pr.then(function () {}, function () {}); return pr;
+  }
+  /* 화면 먼저 반영(낙관적 갱신): 결과는 같은 엔진으로 미리 계산해 바로 보여 주고, 서버 확정은 뒤에서.
+   * 실패하면 안내 후 서버 상태로 다시 불러옴. 대기 중인 쓰기가 없을 때만 서버 지갑·재료 값으로 맞춤(앞선 응답이 뒤의 화면 반영을 되돌리지 않게) */
+  function commit(action, payload, onOk) {
+    return act(action, payload).then(function (res) {
+      if (!res.ok) { if (res.error.code !== 'VERSION_CONFLICT') { toast(res.error.message); reload().then(render); } return res; }
+      if (pendingWrites === 0) { if (res.data.wallet) S.wallet = res.data.wallet; if (res.data.materials) S.materials = res.data.materials; }
+      if (onOk) onOk(res.data);
+      return res;
+    });
   }
   function reload() {
     return Api.call('loadSave', {}, { read: true }).then(function (res) { if (res.ok) setSave(res.data); return res; });
@@ -195,19 +209,45 @@
         '</div></div>';
     },
 
-    /* GZ-02 골프존앱 메인(추천탭) 런처: 상단 [스크린로그인]이 레이드의 유일한 진입(C-11) */
+    /* GZ-02 골프존앱 메인(추천탭) 재현: 상단 글로벌 영역 중앙 우측 [스크린 로그인]이 레이드의 유일한 진입(C-11).
+     * 실제 앱 화면(360 기준)과 버튼 위치·크기를 맞춤. 광고 배너 자리에 게임 배너(입장) */
     launcher: function () {
-      var apps = ['예약', '스코어', '레슨', '마켓', '이벤트', '골프장', '[게임]', '더보기'];
-      return '<div class="screen gz"><div class="scroll" style="padding:16px 20px 20px">' +
-        '<div class="row"><p style="font-size:22px;font-weight:700;color:#1F3F8F">GOLFZON</p><button class="chip" style="background:#E3E8DF;color:#1B2620" data-a="logout">로그아웃</button></div>' +
-        '<button class="btn sl-btn" data-a="launcherScreen" data-mini="sl">스크린로그인</button>' +
-        '<p style="font-size:18px;font-weight:700">' + esc(S.member.nickname) + '님, 오늘도 굿샷!</p>' +
-        '<div style="height:150px;border-radius:16px;background:linear-gradient(#0000 30%,#000c),url(' + asset('webtoon_01.jpg') + ') center 62%/cover,#2A1F5C;color:#F3F5EE;padding:16px;display:flex;flex-direction:column;justify-content:flex-end"><p style="font-family:Black Han Sans;font-size:24px">균열의 페어웨이</p><p style="font-size:13px;opacity:.8">스크린 라운드가 레이드가 되는 방치형 RPG</p></div>' +
-        '<div class="launcher">' + apps.map(function (a) {
-          return a === '[게임]' ? '<div class="game" data-a="enterGame"><i style="background:url(' + asset('icon_game.png') + ') center/cover"></i><b style="color:#6A4BD8">게임</b></div>' : '<div><i></i>' + a + '</div>';
-        }).join('') + '</div>' +
-        '<p class="sub" style="color:#4A5650">추천탭 아이콘 [게임]을 누르면 게임이 열립니다</p>' +
-        '</div></div>';
+      var ic = {
+        cal: '<rect x="5" y="7" width="22" height="18" rx="2" fill="#E9ECF1" stroke="#9AA3AF"/><rect x="5" y="7" width="22" height="5" fill="#9AA3AF"/><circle cx="24" cy="23" r="6" fill="#F04E4E"/><path d="M24 20v3.5h2.5" stroke="#fff" stroke-width="1.6" fill="none"/>',
+        pin: '<path d="M16 4a8 8 0 0 0-8 8c0 6 8 15 8 15s8-9 8-15a8 8 0 0 0-8-8z" fill="#2D6FE0"/><circle cx="16" cy="12" r="4.5" fill="#fff"/><text x="16" y="14.5" font-size="6.5" text-anchor="middle" fill="#2E8B57" font-weight="700">P</text>',
+        coin: '<ellipse cx="16" cy="23" rx="9" ry="3.5" fill="#E2A92B"/><ellipse cx="16" cy="20" rx="9" ry="3.5" fill="#F2C24A"/><circle cx="17" cy="12" r="7" fill="#F2C24A" stroke="#D9A21E"/><text x="17" y="15" font-size="8" text-anchor="middle" fill="#fff" font-weight="700">G</text>',
+        plus: '<rect x="7" y="8" width="18" height="17" rx="3" fill="#F3F4F6" stroke="#D1D5DB"/><path d="M16 11v11M10.5 16.5h11" stroke="#F0743A" stroke-width="4" stroke-linecap="round"/>',
+        gtour: '<text x="16" y="19" font-size="7.4" text-anchor="middle" fill="#1F2A44" font-weight="800" letter-spacing=".2">GTOUR</text>',
+        range: '<path d="M10 7l6-2v8l-6 2z" fill="#F0743A"/><path d="M16 5l6 2v8l-6-2z" fill="#1F3F8F"/><text x="16" y="22" font-size="4.6" text-anchor="middle" fill="#4A5260" font-weight="800">GOLFZON</text><text x="16" y="27" font-size="5" text-anchor="middle" fill="#4A5260" font-weight="800">RANGE</text>',
+        chip: '<circle cx="12" cy="17" r="6" fill="#F04E4E"/><circle cx="12" cy="17" r="2.6" fill="#fff"/><circle cx="21" cy="10" r="5" fill="#2D6FE0"/><circle cx="21" cy="10" r="2" fill="#fff"/><ellipse cx="17" cy="25" rx="8" ry="2.5" fill="#9CA3AF"/>',
+        score: '<rect x="6" y="7" width="9" height="8" fill="#2D6FE0"/><rect x="17" y="7" width="9" height="8" fill="#2D6FE0"/><rect x="6" y="17" width="9" height="8" fill="#E5E7EB"/><rect x="17" y="17" width="9" height="8" fill="#E5E7EB"/><text x="10.5" y="13.5" font-size="6" fill="#fff" text-anchor="middle">1</text><text x="21.5" y="13.5" font-size="6" fill="#fff" text-anchor="middle">2</text><text x="10.5" y="23.5" font-size="6" fill="#333" text-anchor="middle">0</text><text x="21.5" y="23.5" font-size="6" fill="#333" text-anchor="middle">-1</text>',
+        feed: '<rect x="5" y="7" width="20" height="16" rx="2" fill="#3B82F6"/><rect x="5" y="7" width="20" height="4" fill="#E5E7EB"/><circle cx="23" cy="22" r="5.5" fill="#F04E4E"/><path d="M23 25l-2.6-2.6a1.5 1.5 0 0 1 2.6-1.6 1.5 1.5 0 0 1 2.6 1.6z" fill="#fff"/>',
+        album: '<rect x="6" y="8" width="20" height="16" fill="#fff" stroke="#D1D5DB"/><rect x="8" y="10" width="16" height="12" fill="#5BC0EB"/><path d="M8 22l5-6 4 4 3-3 4 5z" fill="#3FA34D"/><path d="M12 11v6" stroke="#fff"/><path d="M12 11l3 1-3 1" fill="#F04E4E"/>'
+      };
+      var svg = function (k) { return '<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">' + ic[k] + '</svg>'; };
+      var apps = [['cal', '스크린예약'], ['pin', '매장찾기'], ['coin', '혜택존'], ['plus', '플러스샵'], ['gtour', 'GTOUR'], ['range', '연습예약'], ['chip', '골프한판'], ['score', '필드라이프'], ['feed', '피드'], ['album', '앨범']];
+      var nav = [['home', '홈', '<path d="M5 13l11-8 11 8v13H5z" fill="#111"/><text x="16" y="22" font-size="9" fill="#fff" text-anchor="middle" font-weight="800">G</text>'],
+        ['friend', '골프친구', '<circle cx="16" cy="16" r="9" fill="none" stroke="#9CA3AF" stroke-width="2"/><path d="M7 14h18M12 20c2 2 6 2 8 0" stroke="#9CA3AF" stroke-width="2" fill="none"/>'],
+        ['member', '멤버십', '<path d="M16 5l9 5v12l-9 5-9-5V10z" fill="none" stroke="#9CA3AF" stroke-width="2"/><text x="16" y="20" font-size="9" fill="#9CA3AF" text-anchor="middle" font-weight="800">G</text>'],
+        ['my', 'MY', '<circle cx="16" cy="16" r="10" fill="none" stroke="#9CA3AF" stroke-width="2"/><circle cx="16" cy="13" r="3.5" fill="none" stroke="#9CA3AF" stroke-width="2"/><path d="M10 22c3-4 9-4 12 0" stroke="#9CA3AF" stroke-width="2" fill="none"/>'],
+        ['menu', '전체메뉴', '<path d="M9 10h14M7 16h12M9 22h14" stroke="#9CA3AF" stroke-width="2.2"/>']];
+      return '<div class="screen gzm">' +
+        '<header class="gzm-top"><button class="gzm-nick" data-a="gzMy">' + esc(S.member.nickname) + ' <span>›</span></button>' +
+        '<button class="gzm-sl sl-btn" data-a="launcherScreen" data-mini="sl">스크린 로그인</button>' +
+        '<svg class="gzm-ic" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="7" fill="none" stroke="#111" stroke-width="2.2"/><path d="M16 16l5 5" stroke="#111" stroke-width="2.4" stroke-linecap="round"/></svg>' +
+        '<svg class="gzm-ic pass" viewBox="0 0 30 24"><path d="M3 7V3h4M27 7V3h-4M3 17v4h4M27 17v4h-4" stroke="#111" stroke-width="2" fill="none"/><text x="15" y="15.5" font-size="8.6" font-style="italic" font-weight="800" text-anchor="middle" fill="#111">PASS</text></svg>' +
+        '<svg class="gzm-ic" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l2 2H4z" fill="none" stroke="#111" stroke-width="2"/><path d="M10 21h4" stroke="#111" stroke-width="2"/></svg></header>' +
+        '<div class="gzm-scroll scroll">' +
+        '<nav class="gzm-tabs"><b>추천</b><span>스크린</span><span class="gzm-game" data-a="enterGame">게임<sup>NEW</sup></span><span>필드</span><span>연습</span><span>쇼핑</span><span>미디어</span></nav>' +
+        '<div class="gzm-notice"><i style="background-image:url(' + asset('icon_game.png') + ')"></i><div><b>스크린 라운드가 던전 레이드로!</b><p>골프존 G핸디 등급으로 보스를 공략해요 ✨</p></div><span class="x">✕</span></div>' +
+        '<div class="gzm-apps launcher">' + apps.map(function (a) { return '<div><i>' + svg(a[0]) + '</i><span>' + a[1] + '</span></div>'; }).join('') + '</div>' +
+        '<div class="gzm-banner" data-a="enterGame" style="background-image:linear-gradient(90deg,#0B0716F2 10%,#0B0716AA 45%,#0B071600 75%),url(' + asset('webtoon_01.jpg') + ')"><em>NEW</em>' +
+        '<div><p class="t1">골프존앱 방치형 RPG</p><p class="t2">균열의 페어웨이</p><p class="t3">탭하여 게임 시작 ›</p></div><span class="pg">1 / 5</span></div>' +
+        '<div class="gzm-cards"><div class="c red"><p>사냥은 방치로</p><b>코스가 곧<br>사냥터</b></div><div class="c"><p class="blue">스크린 연동</p><b>샷이 곧<br>보스 공격!</b></div><div class="c"><p class="blue">튜토리얼</p><b>완료하면<br>300G 지급</b></div></div>' +
+        '<div class="gzm-fill"></div></div>' +
+        '<div class="gzm-pass"><b class="gp">G</b><b class="pt">PASS</b><span class="pm">포인트·머니 ⌃</span><span class="pb">포인트 혜택</span><b class="amt">0원</b></div>' +
+        '<nav class="gzm-nav">' + nav.map(function (n, i) { return '<button' + (i === 0 ? ' class="on"' : '') + (n[0] === 'my' ? ' data-a="gzMy"' : '') + '><svg viewBox="0 0 32 32" width="24" height="24">' + n[2] + '</svg><span>' + n[1] + '</span></button>'; }).join('') + '</nav>' +
+        '</div>';
     },
 
     /* GM-00 인트로 웹툰(P0 축약 4컷 ①②⑦⑨, B-15: 1·2컷 이미지 교체) */
@@ -234,19 +274,25 @@
 
     /* GM-01 사냥터 지역 지도 + 다음 목표 카드 + 미션·랭킹 아이콘 */
     map: function () {
-      var pos = { METRO: [24, 14], GANGWON: [68, 12], CHUNGCHEONG: [22, 30], JEOLLA: [22, 47], GYEONGSANG: [72, 36], JEJU: [21, 70], OVERSEAS: [74, 61], VIRTUAL: [52, 86] };
-      var cp = cpOf(mainJob());
+      var pos = { METRO: [24, 14], GANGWON: [68, 12], CHUNGCHEONG: [22, 30], JEOLLA: [22, 47], GYEONGSANG: [72, 36], JEJU: [21, 70], OVERSEAS: [74, 61], VIRTUAL: [52, 79] };
+      var mj = mainJob(), cp = cpOf(mj), tot = 0, opn = 0;
+      // 지역별 해금 코스 수 / 전체 코스 수(대표 캐릭터 전투력 기준) — 해금 니즈를 지도에서 바로 보여 줌(v0.5 보완)
       var pins = M.regions.map(function (r) {
-        var open = M.courses.some(function (c) { return c.regionId === r.id && Engine.canEnterCourse(M, cp, c); });
-        var p = pos[r.id];
-        return '<button class="pin' + (open ? '' : ' lock') + '" style="left:' + p[0] + '%;top:' + p[1] + '%" data-a="region" data-v="' + r.id + '">' + esc(r.name) + ' ' + r.courseCount + (open ? '' : ' · 잠김') + '</button>';
+        var list = M.courses.filter(function (c) { return c.regionId === r.id; });
+        var n = list.filter(function (c) { return Engine.canEnterCourse(M, cp, c); }).length, all = list.length, p = pos[r.id];
+        tot += all; opn += n;
+        return '<button class="pin' + (n ? '' : ' lock') + (n === all ? ' full' : '') + '" style="left:' + p[0] + '%;top:' + p[1] + '%" data-a="region" data-v="' + r.id + '">' +
+          '<span class="pn">' + esc(r.name) + '</span><span class="pc"><b>' + n + '</b> / ' + all + '</span>' +
+          '<i class="pbar"><i style="width:' + Math.round(n / Math.max(1, all) * 100) + '%"></i></i></button>';
       }).join('');
+      var ns = nextStar(cp);
       return gameScreen('map',
         '<div class="row" style="gap:8px">' + goalCard() +
         '<div class="sideicons"><button data-a="missions" aria-label="일일 미션">' + img('icon_mission.png') + '<span>미션</span></button>' +
         '<button data-a="rank" aria-label="랭킹">' + img('icon_rank.png') + '<span>랭킹</span></button></div></div>' +
         '<button class="btn gold" data-a="region" data-v="REC" data-tut="rec">지금 사냥 가능한 코스 보기</button>' +
-        '<div class="map" style="background-image:url(' + asset('map_world.jpg') + '),radial-gradient(circle at 30% 30%,#24503B,#15301F 70%)">' + pins + '</div>' +
+        '<div class="map" style="background-image:url(' + asset('map_world.jpg') + '),radial-gradient(circle at 30% 30%,#24503B,#15301F 70%)">' +
+        '<div class="maplegend"><b>' + esc(job(mj).name) + ' · 전투력 ' + fmt(cp) + ' 기준</b><span>해금 코스 <b>' + opn + '</b> / ' + tot + (ns ? ' · ' + fmt(ns.need) + ' 더 올리면 ' + ns.star + '성 해금' : '') + '</span></div>' + pins + '</div>' +
         huntBar());
     },
 
@@ -695,7 +741,8 @@
     S.tutorial.step = n; S.tutorial.done = n >= S.tutorial.steps; S.member.tutorial_step = S.tutorial.done ? 'DONE' : String(n);
     act('tutorialStep', { step: n }).then(function (res) {
       if (!res.ok) return;
-      S.tutorial = res.data.tutorial;
+      // 진행 저장은 동시에 보내므로 응답 순서가 바뀔 수 있음 → 화면보다 앞선 단계일 때만 서버 값을 씀
+      if (res.data.tutorial && (res.data.tutorial.done || Number(res.data.tutorial.step) >= Number(S.tutorial.step))) S.tutorial = res.data.tutorial;
       if (res.data.reward_gold) { S.wallet.gold += res.data.reward_gold; render(); }
     });
     if (S.tutorial.done) popup = { type: 'tutDone', gold: S.tutorial.done_reward_at ? 0 : M.tutorial.doneGold };
@@ -731,9 +778,10 @@
   var hiddenTaps = [];
   var A = {
     home: function () { go('launcher'); },
+    gzMy: function () { popup = { type: 'confirm', title: S.member.nickname + '님', text: '시연용 테스트 계정으로 로그인 중이에요. 로그아웃할까요?', yes: '로그아웃', no: '닫기', run: function () { A.logout(); } }; render(); },
     launcherScreen: function () { if (S.member.intro_seen !== 'Y') { go('intro'); return; } A.dgLoginOpen(); },
     tab: function (d) { go(d.v); },
-    logout: function () { Api.logout(); S = null; D.round = null; D.er = null; TUT.replay = false; go('login'); },
+    logout: function () { Api.logout(); S = null; LAST = {}; D.round = null; D.er = null; TUT.replay = false; go('login'); },
     enterGame: function () {
       if (S.member.intro_seen !== 'Y') { go('intro'); return; }
       if (tutActive() && !TUT.replay) { go(tutHome(tutCur())); return; }
@@ -767,15 +815,23 @@
       go('craft', { job: rec.jobId }); popup = { type: 'craftDetail', id: rec.id }; render();
     },
     missions: function () {
-      popup = { type: 'missions', data: null }; render();
+      popup = { type: 'missions', data: LAST.missions || null }; render(); // 지난 값을 먼저 보여 주고 새 값으로 바꿈
       Api.call('missions', {}, { read: true }).then(function (res) {
         if (!popup || popup.type !== 'missions') return;
-        if (!res.ok) { popup = null; toast(res.error.message); return; }
-        popup.data = res.data; render();
+        if (!res.ok) { if (!popup.data) popup = null; toast(res.error.message); render(); return; }
+        LAST.missions = popup.data = res.data; render();
       });
     },
     missionClaim: function (d, el) {
       el.disabled = true;
+      var ms = popup && popup.type === 'missions' && popup.data && (popup.data.missions || []).filter(function (x) { return x.mission_id === d.v; })[0];
+      if (ms && ms.done && !ms.claimed) { // 보상은 기준 데이터로 정해져 있으므로 바로 반영
+        var r0 = ms.reward || {}; ms.claimed = true; ms.claimed_at = new Date(now()).toISOString();
+        S.wallet.gold += r0.gold || 0; addMats(r0.materials || {}); render();
+        toast('미션 보상 ' + [r0.gold ? fmt(r0.gold) + 'G' : '', Object.keys(r0.materials || {}).map(function (k) { return matName(k) + ' ' + r0.materials[k]; }).join(' ')].filter(Boolean).join(' + '));
+        commit('missionClaim', { mission_id: d.v }, function (data) { if (popup && popup.type === 'missions') { popup.data = data.missions; render(); } });
+        return;
+      }
       act('missionClaim', { mission_id: d.v }).then(function (res) {
         if (!res.ok) { toast(res.error.message); render(); return; }
         S.wallet = res.data.wallet; if (res.data.materials) S.materials = res.data.materials;
@@ -789,11 +845,11 @@
       if (d.v === 'mat') go('items', { tab: 'mat' }); else if (d.v === 'hunt') go(S.hunt ? 'hunt' : 'map'); else go(d.v);
     },
     rank: function () {
-      go('rank', { data: null });
+      go('rank', { data: LAST.rank || null });
       Api.call('ranking', {}, { read: true }).then(function (res) {
         if (view.name !== 'rank') return;
         if (!res.ok) { toast(res.error.message); return; }
-        view.p.data = res.data; render();
+        LAST.rank = view.p.data = res.data; render();
       });
     },
     cpHelp: function () { popup = { type: 'cpHelp' }; render(); },
@@ -814,15 +870,18 @@
       S.member.goal_item_id = d.v; render(); toast('목표로 설정했어요 · 사냥 화면에서 진행을 볼 수 있어요');
       act('setGoal', { item_id: d.v }).then(function (res) { if (!res.ok) toast(res.error.message); });
     },
-    doCraft: function (d, el) {
-      el.disabled = true; el.textContent = '제작 중…';
-      act('craft', { item_id: d.v }).then(function (res) {
-        if (!res.ok) { popup = null; toast(res.error.message); return; }
-        S.wallet = res.data.wallet; S.items.push(res.data.item);
-        if (res.data.materials) S.materials = res.data.materials;
-        else { var cost = Engine.craftCost(M, d.v); Object.keys(cost).forEach(function (k) { S.materials[k] -= cost[k]; }); }
-        if (S.member.goal_item_id === d.v) { S.member.goal_item_id = null; act('setGoal', { item_id: null }); } // 목표 장비를 만들면 다음 추천으로
-        popup = { type: 'crafted', item: res.data.item, great: res.data.great }; tutDone(4); render();
+    doCraft: function (d) {
+      if (Engine.craftShortage(M, d.v, S.wallet, S.materials).length) { toast('재료 또는 골드가 부족해요'); return; }
+      var seed = Api.uuid(), invId = Api.uuid(), r = Engine.craftResult(M, d.v, seed), cost = Engine.craftCost(M, d.v);
+      Object.keys(cost).forEach(function (k) { S.materials[k] -= cost[k]; }); S.wallet.gold -= IX.recipe[d.v].gold;
+      var item = { inv_item_id: invId, item_id: d.v, is_great: r.great ? 'Y' : 'N', cp: r.cp, equipped_job_id: '' };
+      S.items.push(item);
+      if (S.member.goal_item_id === d.v) { S.member.goal_item_id = null; act('setGoal', { item_id: null }); } // 목표 장비를 만들면 다음 추천으로
+      popup = { type: 'crafted', item: item, great: r.great }; tutDone(4); render();
+      commit('craft', { item_id: d.v, seed: seed, inv_item_id: invId }, function (data) {
+        if (data.item && (data.item.inv_item_id !== invId || Number(data.item.cp) !== r.cp)) { // 서버 값이 기준
+          item.inv_item_id = data.item.inv_item_id; item.cp = Number(data.item.cp); item.is_great = data.item.is_great; render();
+        }
       });
     },
     equip: function (d) {
@@ -836,23 +895,20 @@
       tutDone(5); go('char', { job: it.jobId });
       act('equip', { inv_item_id: d.v }).then(function (res) {
         if (!res.ok) { toast(res.error.message); reload().then(render); return; }
-        S.characters = res.data.characters; S.member.account_cp = res.data.account_cp;
+        if (pendingWrites === 0) { S.characters = res.data.characters; S.member.account_cp = res.data.account_cp; }
         if (view.name === 'char') render();
       });
     },
     unequip: function (d) {
-      act('unequip', { inv_item_id: d.v }).then(function (res) {
-        if (!res.ok) { toast(res.error.message); return; }
-        S.items.forEach(function (i) { if (i.inv_item_id === d.v) i.equipped_job_id = ''; }); S.characters = res.data.characters; popup = null; render();
-      });
+      S.items.forEach(function (i) { if (i.inv_item_id === d.v) i.equipped_job_id = ''; }); popup = null; render();
+      commit('unequip', { inv_item_id: d.v }, function (data) { if (pendingWrites === 0) { S.characters = data.characters; S.member.account_cp = data.account_cp; } });
     },
     sell: function (d) {
       var x = S.items.filter(function (i) { return i.inv_item_id === d.v; })[0];
       popup = { type: 'confirm', title: '판매할까요?', text: IX.item[x.item_id].name + ' · ' + fmt(Engine.sellPrice(M, x.item_id)) + 'G (판매 후 되돌릴 수 없어요)', yes: '판매', run: function () {
-        act('sellItem', { inv_item_id: d.v }).then(function (res) {
-          if (!res.ok) { toast(res.error.message); return; }
-          S.items = S.items.filter(function (i) { return i.inv_item_id !== d.v; }); S.wallet = res.data.wallet; toast(fmt(res.data.price) + 'G 획득'); render();
-        });
+        var price = Engine.sellPrice(M, x.item_id);
+        S.items = S.items.filter(function (i) { return i.inv_item_id !== d.v; }); S.wallet.gold += price; toast(fmt(price) + 'G 획득'); render();
+        commit('sellItem', { inv_item_id: d.v });
       } }; render();
     },
     itemTab: function (d) { go('items', { tab: d.v }); },
@@ -863,13 +919,12 @@
       var c = Engine.composeCost(M, popup.id), max = Math.max(1, Math.min(Math.floor(Number(S.materials[c.fromId] || 0) / c.qty), Math.floor(S.wallet.gold / c.gold)));
       popup.n = d.v === 'max' ? max : Math.max(1, Math.min(max, (popup.n || 1) + Number(d.v))); render();
     },
-    doCompose: function (d, el) {
-      el.disabled = true; el.textContent = '합성 중…';
-      act('compose', { material_id: d.v, count: popup.n || 1 }).then(function (res) {
-        if (!res.ok) { toast(res.error.message); render(); return; }
-        var n = popup.n || 1; S.materials = res.data.materials; S.wallet = res.data.wallet; popup = null;
-        toast(matName(d.v) + ' ' + n + '개 합성 완료'); render();
-      });
+    doCompose: function (d) {
+      var c = Engine.composeCost(M, d.v), n = popup.n || 1;
+      if (Number(S.materials[c.fromId] || 0) < c.qty * n || S.wallet.gold < c.gold * n) { toast('재료 또는 골드가 부족해요'); return; }
+      S.materials[c.fromId] -= c.qty * n; S.materials[d.v] = Number(S.materials[d.v] || 0) + n; S.wallet.gold -= c.gold * n;
+      popup = null; toast(matName(d.v) + ' ' + n + '개 합성 완료'); render();
+      commit('compose', { material_id: d.v, count: n });
     },
     charJob: function (d) { go('char', { job: d.v }); },
     setMain: function (d) {
@@ -877,10 +932,11 @@
       act('setMainJob', { job_id: d.v }).then(function (res) { if (res.ok) toast(job(d.v).name + '을(를) 대표 캐릭터로 설정했어요'); });
     },
     chestOpen: function (d) {
+      var ch = S.chests.filter(function (x) { return x.chest_id === d.v; })[0], loc = ch && chestLocal(ch);
+      if (loc) { chestApply(d.v, loc); popup = { type: 'chestOpened', res: loc }; render(); commit('chestOpen', { chest_id: d.v, item_ids: loc.items.map(function (x) { return x.inv_item_id; }) }); return; }
       act('chestOpen', { chest_id: d.v }).then(function (res) {
         if (!res.ok) { toast(res.error.message); return; }
-        var c = res.data.contents; S.wallet = res.data.wallet; addMats(c.materials); addMats(c.special);
-        S.items = S.items.concat(res.data.items); S.chests = S.chests.filter(function (x) { return x.chest_id !== d.v; });
+        chestApply(d.v, res.data); S.wallet = res.data.wallet;
         popup = { type: 'chestOpened', res: res.data }; render();
       });
     },
@@ -919,26 +975,61 @@
       if (view.name === 'hunt' || view.name === 'map') render();
     });
   }
+  /** 상자 내용(서버가 레이드 종료 때 확정해 둔 값)으로 개봉 결과를 미리 만듦 */
+  function chestLocal(c) {
+    var con = c.contents; if (typeof con === 'string') { try { con = JSON.parse(con); } catch (e) { con = null; } }
+    if (!con || !con.materials) return null;
+    return { contents: con, items: (con.items || []).map(function (id) { return { inv_item_id: Api.uuid(), item_id: id, is_great: 'N', cp: IX.item[id].cp, equipped_job_id: '' }; }) };
+  }
+  function chestApply(id, data) {
+    var c = data.contents; S.wallet.gold += c.gold; addMats(c.materials); addMats(c.special);
+    S.items = S.items.concat(data.items); S.chests = S.chests.filter(function (x) { return x.chest_id !== id; });
+  }
   function claim(skip, thenCourse) {
     var h = S.hunt; if (!h) return;
-    act('huntClaim', skip ? { skip: true } : {}).then(function (res) {
-      if (!res.ok && res.error.code === 'NO_TICKS') {
-        popup = { type: 'confirm', title: '보상 없이 종료할까요?', text: h.tutorial ? '체험 보상은 시작 30초 뒤에 쌓여요.' : '아직 쌓인 보상이 없어요(5분마다 계산).', yes: '보상 없이 종료', no: '계속 사냥', run: function () {
-          act('huntClaim', { cancel: true }).then(function (r2) { if (r2.ok) { S.hunt = null; if (thenCourse) startHunt(thenCourse); else go('map'); } });
-        } }; render(); return;
-      }
-      if (!res.ok) { toast(res.error.message); return; }
-      S.hunt = null; S.wallet = res.data.wallet;
-      var rw = res.data.reward; addMats(rw.materials);
-      S.items = S.items.concat(res.data.items);
-      if (S.tutorial && res.data.tutorial_trial) { S.tutorial.trial_available = false; S.tutorial.trial_reward_at = new Date(now()).toISOString(); }
+    var noTicks = function () {
+      popup = { type: 'confirm', title: '보상 없이 종료할까요?', text: h.tutorial ? '체험 보상은 시작 30초 뒤에 쌓여요.' : '아직 쌓인 보상이 없어요(5분마다 계산).', yes: '보상 없이 종료', no: '계속 사냥', run: function () {
+        S.hunt = null; if (thenCourse) startHunt(thenCourse); else go('map'); // 화면 먼저, 서버 종료는 뒤에서
+        commit('huntClaim', { cancel: true });
+      } }; render();
+    };
+    // 같은 엔진·같은 시드로 보상을 미리 계산해 결과를 바로 보여 줌(v0.5 최적화). 시드를 아직 못 받았으면 서버 응답을 기다림
+    var local = null;
+    if (h.seed && !h.pending) {
+      var ticks = skip ? Engine.huntMaxTicks(M, h.tutorial) : Engine.huntTicks(M, Date.parse(h.started_at), now(), h.tutorial);
+      if (!ticks) { noTicks(); return; }
+      var rw0 = Engine.huntRewards(M, h, ticks);
+      local = { reward: rw0, items: rw0.items.map(function (id) { return { inv_item_id: Api.uuid(), item_id: id, is_great: 'N', cp: IX.item[id].cp, equipped_job_id: '' }; }), tutorial_trial: !!h.tutorial };
+    }
+    var apply = function (data) {
+      S.hunt = null; S.wallet.gold += data.reward.gold;
+      var rw = data.reward; addMats(rw.materials);
+      S.items = S.items.concat(data.items);
+      if (S.tutorial && data.tutorial_trial) { S.tutorial.trial_available = false; S.tutorial.trial_reward_at = new Date(now()).toISOString(); }
       tutDone(3);
       if (thenCourse) { // 사냥터 이동: 결과창 없이 희귀 획득만 토스트(B-07)
         var rare = Object.keys(rw.materials).filter(function (id) { return IX.material[id].isSpecial; }).map(function (id) { return matName(id) + ' ' + rw.materials[id]; })
-          .concat(res.data.items.map(function (x) { return IX.item[x.item_id].name; }));
+          .concat(data.items.map(function (x) { return IX.item[x.item_id].name; }));
         startHunt(thenCourse); toast('보상 ' + fmt(rw.gold) + 'G 수령' + (rare.length ? ' · 희귀 획득! ' + rare.join(', ') : '')); return;
       }
-      view = { name: 'map', p: {} }; resetScroll = true; popup = { type: 'huntResult', res: res.data, course: h.course_id }; render();
+      view = { name: 'map', p: {} }; resetScroll = true; popup = { type: 'huntResult', res: data, course: h.course_id }; render();
+    };
+    var payload = skip ? { skip: true } : {};
+    if (local) {
+      payload.item_ids = local.items.map(function (x) { return x.inv_item_id; });
+      apply(local);
+      commit('huntClaim', payload, function (data) {
+        // 경계 시각에 틱 수가 달라졌으면 서버 값으로 다시 맞춤
+        if (data.reward.ticks !== local.reward.ticks || data.reward.gold !== local.reward.gold) {
+          reload().then(function () { if (popup && popup.type === 'huntResult' && popup.res === local) popup.res = data; render(); });
+        }
+      });
+      return;
+    }
+    act('huntClaim', payload).then(function (res) {
+      if (!res.ok && res.error.code === 'NO_TICKS') { noTicks(); return; }
+      if (!res.ok) { toast(res.error.message); return; }
+      apply(res.data); S.wallet = res.data.wallet;
     });
   }
 
@@ -1413,6 +1504,8 @@
     },
     dgResumeRing: function () {
       if (!D.round) { go('dungeon'); return; }
+      // 같은 화면 세션에서 진행 중이던 레이드는 이미 같은 엔진 상태가 있으므로 바로 열고, 서버 확인은 뒤에서(v0.5 최적화)
+      if (D.er && D.sim && !D.round.finished) { dgOpenRound(); dgSync({}); return; }
       dgResume(D.round.round_id).then(function (ok) { if (ok) dgOpenRound(); else go('dungeon'); });
     },
     dgShowResult: function () { go('dgResult'); },
@@ -1457,10 +1550,27 @@
       });
     },
     dgSp: function (d, el) {
-      el.disabled = true; el.textContent = '사용 중…';
+      el.disabled = true;
+      // 같은 엔진으로 적용 홀을 미리 계산해 바로 표시(서버 응답이 오면 서버 값으로 맞춤, v0.5 최적화)
+      var guess = null;
+      try {
+        var gi = Engine.indexAt(M, D.er, now()), greq = (D.er.sp_requests || []).concat([{ slot: 0, atEvent: gi }]);
+        var gme = Engine.simulateRound(M, D.er, gi, greq).players[0];
+        if (gme.sp_state === 'WAIT' || gme.sp_state === 'RESERVED') guess = { state: gme.sp_state, hole: gme.pending_hole, at_event: gi };
+      } catch (e) { guess = null; }
+      if (guess) {
+        D.spLocal = guess; D.er.sp_requests = greq; D.sim = dgSim(D.shown); render();
+        var box0 = root.querySelector('.spwrap'); if (box0) spawn(box0, '<img class="spuse" src="' + asset('fx_sp_use.png') + '" alt="" onerror="this.remove()">', 900);
+        toast(guess.state === 'WAIT' ? '특수공격 사용! 이번 홀 피니시에 적용돼요' : '홀 종료 뒤라 ' + guess.hole + 'H 피니시에 적용 예약했어요');
+      } else el.textContent = '사용 중…';
       Api.call('spUse', { round_id: D.round.round_id, since_event: D.round.processed }, { read: true }).then(function (res) {
-        if (!res.ok) { toast(res.error.message); render(); return; }
+        if (!res.ok) { if (guess) { D.spLocal = null; D.er.sp_requests = greq.slice(0, -1); D.sim = dgSim(D.shown); } toast(res.error.message); render(); return; }
         var x = res.data; dgApply(x.round);
+        if (guess) {
+          D.spLocal = { state: x.state, hole: x.apply_hole, at_event: x.at_event };
+          if (x.apply_hole !== guess.hole) toast('서버 기준으로 ' + x.apply_hole + 'H 피니시에 적용돼요');
+          render(); dgSchedule(); return;
+        }
         D.spLocal = { state: x.state, hole: x.apply_hole, at_event: x.at_event };
         render();
         var box = root.querySelector('.spwrap'); if (box) spawn(box, '<img class="spuse" src="' + asset('fx_sp_use.png') + '" alt="" onerror="this.remove()">', 900);
@@ -1484,7 +1594,12 @@
     dgOpenChests: function () { D.openState = 'closed'; D.opened = null; if (!D.chests.length) { toast('열 상자가 없어요'); return; } go('dgChest'); },
     dgOpen: function () {
       var c = D.chests[0]; D.openState = 'opening'; render();
-      var started = Date.now();
+      var started = Date.now(), loc = chestLocal(c);
+      if (loc) { // 상자 내용은 레이드 종료 때 이미 정해져 있으므로 개봉 연출(1.5초) 뒤 바로 보여 주고 서버 확정은 뒤에서
+        commit('chestOpen', { chest_id: c.chest_id, item_ids: loc.items.map(function (x) { return x.inv_item_id; }) });
+        setTimeout(function () { chestApply(c.chest_id, loc); D.opened = loc; D.openState = 'done'; render(); }, 1500);
+        return;
+      }
       act('chestOpen', { chest_id: c.chest_id }).then(function (res) {
         var wait = Math.max(0, 1500 - (Date.now() - started));
         setTimeout(function () {
@@ -1556,10 +1671,13 @@
   setInterval(function () { if (view.name === 'hunt' && !document.hidden && S && S.hunt) huntAttack(); }, 1600);
 
   // ---------------- 시작 ----------------
+  // 서버 깨우기(첫 요청 지연 줄임) + 기준 데이터와 저장 데이터를 동시에 받기(v0.5 최적화)
+  Api.warm();
+  var saveP = Api.state.token ? Api.call('loadSave', {}, { read: true }) : null;
   fetch(APP_CONFIG.MASTER_URL).then(function (r) { return r.json(); }).then(function (m) {
     M = m; IX = Engine.index(M);
-    if (!Api.state.token) { go('login'); return; }
-    Api.call('loadSave', {}, { read: true }).then(function (res) {
+    if (!saveP) { go('login'); return; }
+    saveP.then(function (res) {
       if (res.ok) { Api.state.version = res.save_version; setSave(res.data); go('launcher'); dgRestore(); } else { popup = null; Api.logout(); go('login'); }
     });
   }, function () { root.innerHTML = '<div class="screen" style="padding:24px"><p>기준 데이터를 불러오지 못했어요. 새로고침해 주세요.</p></div>'; });

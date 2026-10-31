@@ -4,7 +4,9 @@ var Api = (function () {
   var S = { token: null, version: null, onSave: function () {}, onExpired: function () {}, onTime: function () {} };
   try { S.token = localStorage.getItem('rf_token'); } catch (e) {}
   function uuid() { return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)); }
+  var lastCall = 0;
   function post(body) {
+    lastCall = Date.now();
     return fetch(APP_CONFIG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
       .then(function (r) { return r.json(); });
   }
@@ -40,6 +42,14 @@ var Api = (function () {
         return res;
       }, function () { return { ok: false, error: { code: 'NETWORK', message: '서버에 연결할 수 없어요' } }; });
   }
+  /** 서버 깨우기: Apps Script는 한동안 요청이 없으면 첫 응답이 느려지므로, 앱을 열 때와 화면이 보이는 동안 4분마다 가벼운 GET */
+  var warmAt = 0;
+  function warm() {
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || Date.now() - warmAt < 60000) return;
+    warmAt = Date.now(); fetch(APP_CONFIG.API_URL).catch(function () {});
+  }
+  setInterval(function () { if (!document.hidden && Date.now() - lastCall > 200000) warm(); }, 60000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && Date.now() - lastCall > 200000) warm(); });
   function logout() { S.token = null; try { localStorage.removeItem('rf_token'); } catch (e) {} }
-  return { call: call, login: login, logout: logout, state: S, uuid: uuid };
+  return { call: call, login: login, logout: logout, state: S, uuid: uuid, warm: warm };
 })();
