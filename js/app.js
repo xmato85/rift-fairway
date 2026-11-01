@@ -18,8 +18,80 @@
   function fmt(n) { return Number(n || 0).toLocaleString('ko-KR'); }
   function fmtR(n) { return fmt(Math.round(Number(n || 0))); }
   function now() { return Date.now() + offset; }
-  function asset(name) { return APP_CONFIG.ASSET_DIR + name; }
-  function img(name, cls) { return '<img' + (cls ? ' class="' + cls + '"' : '') + ' src="' + asset(name) + '" alt="" onerror="this.remove()">'; }
+  // v0.6 B-42: 이미지는 WebP로 제공(.png 이름으로 불러도 .webp를 씀). 화면 밖 이미지는 지연 로딩
+  function asset(name) { return APP_CONFIG.ASSET_DIR + String(name).replace(/\.png$/, '.webp') + (APP_CONFIG.ASSET_VER ? '?v=' + APP_CONFIG.ASSET_VER : ''); }
+  function img(name, cls) { return '<img' + (cls ? ' class="' + cls + '"' : '') + ' src="' + asset(name) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">'; }
+  // ---- v0.6 외형 단계(B-30~B-32): 단계 이미지가 아직 없으면 기존 이미지 + 단계별 임시 색 처리(.ph) ----
+  var LOOK_NAME = ['기본', '일반', '고급', '희귀', '영웅', '전설'], LOOK_COLOR = ['#9AA3AF', '#E6E6E6', '#4CC38A', '#4A9BFF', '#A77BFF', '#F6C445'];
+  function lookOf(j) { return Engine.lookOf(M, j, S.items || []); }
+  function charSrc(j, stage, atk) { return 'char_' + JOB_FILE[j] + '_s' + stage + (atk ? '_atk' : '') + '.webp'; }
+  function charStage(j, stage, atk) { return APP_CONFIG.ASSET_DIR + charSrc(j, stage, atk) + (APP_CONFIG.ASSET_VER ? '?v=' + APP_CONFIG.ASSET_VER : ''); }
+  function charFallback(j, atk) { return asset('char_' + JOB_FILE[j] + (atk ? '_attack' : '') + '.png'); }
+  /** 캐릭터 외형 그림: 단계 그림 + 세트 효과 층. pose: 'idle' | 'atk' | 'both'(사냥: 대기·공격 2장) */
+  function charPic(j, lk, pose, cls) {
+    lk = lk || { stage: 0, set: 0 };
+    var ready = APP_CONFIG.LOOK_IMAGES, one = function (atk, c) {
+      if (!ready) return '<img class="' + (c || '') + '" src="' + charFallback(j, atk) + '" alt="" loading="lazy" decoding="async">';
+      return '<img class="' + (c || '') + '" src="' + charStage(j, lk.stage, atk) + '" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=\'' + charFallback(j, atk) + '\';this.parentNode.classList.add(\'ph\')">';
+    };
+    return '<span class="look ls' + lk.stage + ' st' + (lk.set || 0) + (ready ? '' : ' ph') + ' ' + (cls || '') + '" style="--lc:' + LOOK_COLOR[lk.stage] + '"><i class="setfx"></i>' +
+      (pose === 'both' ? one(false, 'idle') + one(true, 'atk') : one(pose === 'atk')) + '</span>';
+  }
+  /** GZ-02 진행 중 레이드 배너(B-39): 실제 골프존앱 '진행 중인 스크린 라운드' 배너와 같은 모양 */
+  function raidBanner() {
+    var ar = S && S.active_round, live = (typeof dgActive === 'function' && dgActive()) || ar;
+    if (!live) return '';
+    var done = D.round && D.sim && D.sim.finished;
+    return '<button class="gzm-raidbar" data-a="raidBanner"><i class="dot"></i><b>' + (done ? '레이드가 끝났어요 · 보상 확인하기' : '진행 중인 레이드가 있습니다') + '</b><span>›</span></button>';
+  }
+  /** 목록형 바텀시트 상단 고정 헤더(B-37): 제목 + 닫기 */
+  function sheetHead(title, extra) { return '<div class="sheethead"><div class="sh-t">' + title + '</div>' + (extra || '') + '<button class="sh-x" data-a="close" aria-label="닫기">✕</button></div>'; }
+  /** 받침 있으면 a(이·을·은), 없으면 b(가·를·는) */
+  function josa(w, a, b) { var c = String(w).charCodeAt(String(w).length - 1) - 0xAC00; return w + (c >= 0 && c <= 11171 && c % 28 ? a : b); }
+  /** 가장 가까운 외형·세트 목표(B-33): items = 내 장비 목록(가상 장착 포함 가능)
+   *  → { done, kind: 'stage'|'set', stage, mark, have, need, text(긴 문장), short(짧은 문장) } */
+  function lookGoalOf(j, items) {
+    var L = M.lookStage || { minParts: 4, setParts: [6, 8] }, max = L.setParts[L.setParts.length - 1], lk = Engine.lookOf(M, j, items);
+    if (lk.stage >= 5 && lk.set >= L.setParts.length) return { done: true, lk: lk, text: '최고 외형·세트 달성!', short: '최고 외형·세트 달성' };
+    if (lk.stage > 0 && lk.count < max) {
+      var m = L.setParts.filter(function (x) { return x > lk.count; })[0], need = m - lk.count;
+      return { kind: 'set', stage: lk.stage, mark: m, have: lk.count, need: need, lk: lk,
+        text: LOOK_NAME[lk.stage] + ' 이상 ' + lk.count + '/' + max + ' · ' + need + '부위 더면 ' + m + '세트 효과', short: LOOK_NAME[lk.stage] + ' ' + m + '세트까지 ' + need + '부위' };
+    }
+    var ns = Math.min(5, lk.stage + 1), have = items.filter(function (x) { return x.equipped_job_id === j && !x.sold_at && IX.item[x.item_id] && IX.item[x.item_id].grade >= ns; }).length, nd = Math.max(0, L.minParts - have);
+    return { kind: 'stage', stage: ns, mark: L.minParts, have: have, need: nd, lk: lk,
+      text: LOOK_NAME[ns] + ' 이상 ' + have + '/' + L.minParts + ' · ' + nd + '부위 더 장착하면 ' + LOOK_NAME[ns] + ' 외형', short: LOOK_NAME[ns] + ' 외형까지 ' + nd + '부위' };
+  }
+  /** 이 장비를 만들어 장착하면 외형이 어떻게 되는지(GM-05 배지, B-33) */
+  function lookBadge(itemId) {
+    var it = IX.item[itemId], j = it.jobId, items = S.items || [];
+    var fake = items.filter(function (x) { return !(x.equipped_job_id === j && IX.item[x.item_id] && IX.item[x.item_id].partId === it.partId); })
+      .concat([{ item_id: itemId, equipped_job_id: j, inv_item_id: '_fake' }]);
+    var b = Engine.lookOf(M, j, items), a = Engine.lookOf(M, j, fake);
+    if (a.stage > b.stage) return '장착하면 ' + LOOK_NAME[a.stage] + ' 외형으로 진화!';
+    if (a.stage === b.stage && a.set > b.set) return '장착하면 ' + LOOK_NAME[a.stage] + ' ' + setLabel(a) + ' 달성!';
+    var g0 = lookGoalOf(j, items), g1 = lookGoalOf(j, fake);
+    if (!g1.done && g1.kind === g0.kind && g1.stage === g0.stage && g1.mark === g0.mark && g1.need < g0.need) return '만들어 장착하면 ' + g1.short;
+    return '';
+  }
+  /** 랭킹을 뒤에서 가볍게 갱신(GM-07 현재 순위·GM-01 다음 순위까지, B-41). 장착하면 다음 갱신을 앞당김 */
+  var rankAt = 0;
+  function rankRefresh(maxAge) {
+    if (!S || S.member.is_demo === 'Y' || Date.now() - rankAt < (maxAge || 120000)) return;
+    rankAt = Date.now();
+    Api.call('ranking', {}, { read: true }).then(function (res) {
+      if (!res.ok || !S) return;
+      LAST.rank = res.data;
+      if ((view.name === 'char' || view.name === 'map') && !popup) render();
+    });
+  }
+  function rankLine() { var r = LAST.rank && LAST.rank.me; return r ? '전체 ' + LAST.rank.total + '명 중 ' + r.rank + '위' : ''; }
+  function setLabel(lk) { return lk && lk.set ? (M.lookStage ? M.lookStage.setParts : [6, 8])[lk.set - 1] + '세트' : ''; }
+  /** 로그인 직후 내 4캐릭터 현재 외형만 미리 받기(G) */
+  function preloadLooks() {
+    if (!S || !S.items) return;
+    JOBS.forEach(function (j) { var lk = lookOf(j); [false, true].forEach(function (a) { var im = new Image(); im.src = APP_CONFIG.LOOK_IMAGES ? charStage(j, lk.stage, a) : charFallback(j, a); }); });
+  }
   // 토스트: 띄울 때만 다시 그리고, 사라질 때는 요소만 지움(화면 애니메이션이 처음부터 다시 돌지 않게)
   function toast(msg) {
     toastMsg = msg; clearTimeout(toastTimer);
@@ -35,7 +107,9 @@
   function matName(id) { return IX.material[id] ? IX.material[id].name : id; }
   function itemIcon(itemId, extra) {
     var it = IX.item[itemId];
-    return '<div class="icon g' + it.grade + '"' + (extra || '') + '>' + img('icon_eq_' + JOB_FILE[it.jobId] + '_' + it.partId.toLowerCase() + '.png') + '<span>' + partName(it.partId) + '</span></div>';
+    // v0.6 B-34: 직업×등급×부위 고유 아이콘(icon_item_{직업}_g{등급}_{부위}). 이미지가 오기 전(ICON_IMAGES=false)에는 기존 부위 아이콘
+    var ic = APP_CONFIG.ICON_IMAGES, file = (ic === true || (ic && ic.indexOf(JOB_FILE[it.jobId]) >= 0)) ? 'icon_item_' + JOB_FILE[it.jobId] + '_g' + it.grade + '_' + it.partId.toLowerCase() + '.png' : 'icon_eq_' + JOB_FILE[it.jobId] + '_' + it.partId.toLowerCase() + '.png';
+    return '<div class="icon g' + it.grade + '"' + (extra || '') + '>' + img(file) + '<span>' + partName(it.partId) + '</span></div>';
   }
   function matIcon(id) {
     var m = IX.material[id];
@@ -47,7 +121,7 @@
   function equippedAt(jobId, partId) { return S.items.filter(function (e) { return e.equipped_job_id === jobId && IX.item[e.item_id].partId === partId; })[0]; }
   function cpGain(itemId) { var it = IX.item[itemId], cur = equippedAt(it.jobId, it.partId); return it.cp - (cur ? cur.cp : 0); }
   function addMats(delta) { Object.keys(delta || {}).forEach(function (k) { S.materials[k] = (S.materials[k] || 0) + delta[k]; }); }
-  function face(name) { return '<img class="pino" src="' + asset(name || 'pino') + '.png" alt="" onerror="this.remove()">'; }
+  function face(name) { return '<img class="pino" src="' + asset((name || 'pino') + '.png') + '" alt="" onerror="this.remove()">'; }
 
   // 쓰기 요청은 순서대로 하나씩(버전 충돌 방지). 진행 표시만 바꾸는 요청(BG)은 줄 서지 않고 바로 보냄(v0.5 최적화)
   var queue = Promise.resolve(), pendingWrites = 0, LAST = {};
@@ -239,7 +313,7 @@
         '<svg class="gzm-ic pass" viewBox="0 0 30 24"><path d="M3 7V3h4M27 7V3h-4M3 17v4h4M27 17v4h-4" stroke="#111" stroke-width="2" fill="none"/><text x="15" y="15.5" font-size="8.6" font-style="italic" font-weight="800" text-anchor="middle" fill="#111">PASS</text></svg>' +
         '<svg class="gzm-ic" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l2 2H4z" fill="none" stroke="#111" stroke-width="2"/><path d="M10 21h4" stroke="#111" stroke-width="2"/></svg></header>' +
         '<div class="gzm-scroll scroll">' +
-        '<nav class="gzm-tabs"><b>추천</b><span>스크린</span><span class="gzm-game" data-a="enterGame">게임<sup>NEW</sup></span><span>필드</span><span>연습</span><span>쇼핑</span><span>미디어</span></nav>' +
+        raidBanner() + '<nav class="gzm-tabs"><b>추천</b><span>스크린</span><span class="gzm-game" data-a="enterGame">게임<sup>NEW</sup></span><span>필드</span><span>연습</span><span>쇼핑</span><span>미디어</span></nav>' +
         '<div class="gzm-notice"><i style="background-image:url(' + asset('icon_game.png') + ')"></i><div><b>스크린 라운드가 던전 레이드로!</b><p>골프존 G핸디 등급으로 보스를 공략해요 ✨</p></div><span class="x">✕</span></div>' +
         '<div class="gzm-apps launcher">' + apps.map(function (a) { return '<div><i>' + svg(a[0]) + '</i><span>' + a[1] + '</span></div>'; }).join('') + '</div>' +
         '<div class="gzm-banner" data-a="enterGame" style="background-image:linear-gradient(90deg,#0B0716F2 10%,#0B0716AA 45%,#0B071600 75%),url(' + asset('webtoon_01.jpg') + ')"><em>NEW</em>' +
@@ -277,7 +351,7 @@
     map: function () {
       var pos = { METRO: [24, 14], GANGWON: [68, 12], CHUNGCHEONG: [22, 30], JEOLLA: [22, 47], GYEONGSANG: [72, 36], JEJU: [21, 70], OVERSEAS: [74, 61], VIRTUAL: [52, 79] };
       var mj = mainJob(), cp = cpOf(mj), tot = 0, opn = 0;
-      setTimeout(function () { missionRefresh(false); }, 0);
+      setTimeout(function () { missionRefresh(false); rankRefresh(180000); }, 0);
       // 지역별 해금 코스 수 / 전체 코스 수(대표 캐릭터 전투력 기준) — 해금 니즈를 지도에서 바로 보여 줌(v0.5 보완)
       var pins = M.regions.map(function (r) {
         var list = M.courses.filter(function (c) { return c.regionId === r.id; });
@@ -341,7 +415,7 @@
         '<div class="row"><button class="chip" data-a="tab" data-v="map">‹ 지도</button><b style="flex:1">' + esc(c.name) + '</b><span class="small">' + '★'.repeat(c.star) + '</span></div>' +
         (dgActive() ? '<button class="raidbadge" data-a="dgResumeRing">레이드 진행 중 · 사냥은 계속돼요 ›</button>' : '') +
         '<div class="stage hstage" data-hunt-stage>' +
-        '<div class="hfig hero-main">' + img('char_' + JOB_FILE[j] + '.png', 'idle') + img('char_' + JOB_FILE[j] + '_attack.png', 'atk') + '</div>' +
+        '<div class="hfig hero-main">' + charPic(j, lookOf(j), 'both') + '</div>' +
         '<div class="hfig mob">' + img('mob_' + reg + '_idle.png', 'idle') + img('mob_' + reg + '_hit.png', 'hit') + '</div>' +
         '<div class="fxlayer"></div></div>' +
         '<div class="card" id="huntCounter">' + huntCounterHtml() + '</div>' +
@@ -413,6 +487,7 @@
         return x ? '<button class="cell g' + IX.item[x.item_id].grade + '" data-a="itemDetail" data-v="' + x.inv_item_id + '">' + itemIcon(x.item_id) + '<span>' + esc(IX.item[x.item_id].name) + '</span></button>'
           : '<button class="cell" data-a="slotPick" data-v="' + pt.id + '" data-j="' + j + '" data-tut="slot-' + pt.id + '"><div class="icon"><span>' + pt.name + '</span></div><span class="small">비어 있음</span></button>';
       }).join('');
+      setTimeout(function () { rankRefresh(60000); }, 0);
       var isMain = j === mainJob(), fx = CPFX && CPFX.job === j && Date.now() - CPFX.at < 4000 ? CPFX : null;
       return gameScreen('char',
         '<div class="chips">' + JOBS.map(function (x) { return '<button class="chip' + (x === j ? ' on' : '') + '" data-a="charJob" data-v="' + x + '">' + job(x).name + (x === mainJob() ? ' ★' : '') + '</button>'; }).join('') + '</div>' +
@@ -421,8 +496,8 @@
         (fx ? '<span class="cpup">' + fmt(fx.from) + ' → ' + fmt(fx.to) + '</span>' : '') + '<button class="info" data-a="cpHelp" aria-label="전투력 도움말">ⓘ</button></div>' +
         '<p class="sub">스킬 ' + esc(sk.name) + ' · 역할 ' + esc(job(j).role) + '</p>' +
         '<p class="small">' + (nsk ? '다음 스킬 「' + esc(nsk.name) + '」 전투력 ' + fmt(nsk.unlockCp) + '에 해금 (' + fmt(nsk.unlockCp - cp) + ' 남음)' : '모든 스킬 해금 완료') + '</p></div>' +
-        '<div class="card"><div class="row"><span class="sub">계정 전투력(4직업 합)</span><b style="flex:1">' + fmt(accountCp()) + '</b><button class="chip" data-a="rank">랭킹 보기</button></div></div>' +
-        '<div class="stage" style="height:170px"><div class="hero big" style="background:#6A4BD8">' + img('char_' + JOB_FILE[j] + '.png') + '</div></div>' +
+        '<div class="card"><div class="row"><span class="sub">계정 전투력(4직업 합)</span><b style="flex:1">' + fmt(accountCp()) + '</b><button class="chip" data-a="rank">랭킹 보기</button></div>' + (rankLine() ? '<p class="rankpos">' + rankLine() + ' · 랭커 카드에 내 4캐릭터 모습이 보여요</p>' : '') + '</div>' +
+        lookCard(j) +
         '<b>장비 8부위</b><div class="grid">' + slots + '</div>' +
         '<b style="margin-top:8px">설정</b>' +
         '<button class="btn ghost" data-a="replayTutorial">튜토리얼 다시 보기</button>' +
@@ -431,13 +506,18 @@
         '<button class="btn ghost" data-a="logout">로그아웃</button>');
     },
 
-    /* GM-10 랭킹: 상위 50 + 하단 고정 내 순위 */
+    /* GM-10 랭킹(v0.6 B-40): 상위 20 랭커 카드(4캐릭터 외형·전투력 + 합산), 1~3위 시상대, 하단 고정 내 카드 */
     rank: function (p) {
       var d = p.data;
-      var row = function (x) { return '<div class="rrow' + (x.is_me ? ' me' : '') + '"><b class="rno">' + x.rank + '</b><span class="rname">' + esc(x.nickname) + '</span><span class="small">' + esc(job(x.main_job_id || 'WAR').name) + '</span><b>' + fmt(x.account_cp) + '</b></div>'; };
       var body = '<div class="row"><button class="chip" data-a="tab" data-v="map">‹ 지도</button><b style="flex:1">전투력 랭킹</b><span class="small">계정 합산(4직업)</span></div>' +
-        (!d ? '<p class="sub">불러오는 중…</p>' : d.top.length ? d.top.map(row).join('') + '<p class="small">상위 ' + d.top.length + '명 · 전체 ' + d.total + '명 · 동점은 먼저 도달한 순</p>' : '<p class="sub">아직 순위가 없어요</p>');
-      var foot = d ? '<div class="rankme">' + (d.me ? row(d.me) : '<p class="small" style="padding:6px 0">시연 계정은 랭킹에서 제외돼요</p>') + '</div>' : '';
+        '<p class="ranknote">장비를 만들어 장착하면 캐릭터 모습이 바뀌고, 다른 골퍼에게도 그 모습이 보여요</p>';
+      if (!d) body += '<p class="sub">불러오는 중…</p>';
+      else if (!d.top.length) body += '<p class="sub">아직 순위가 없어요</p>';
+      else body += podium(d.top.slice(0, 3)) + d.top.map(function (x) { return rankCard(x); }).join('') + '<p class="small">상위 ' + d.top.length + '명 · 전체 ' + d.total + '명 · 동점은 먼저 도달한 순</p>';
+      var foot = '';
+      if (d) foot = '<div class="rankme">' + (d.me ? rankCard(d.me, true) +
+        '<div class="row mynext"><span>' + (d.me.rank === 1 ? '1위를 지키고 있어요!' : (d.me.next_gap ? '다음 순위(' + (d.me.rank - 1) + '위)까지 전투력 <b>' + fmt(d.me.next_gap) + '</b>' : (d.me.rank - 1) + '위와 동점 · 전투력을 올리면 <b>앞설 수 있어요</b>')) + '</span><button class="chip gold" data-a="tab" data-v="craft">제작하러 가기</button></div>'
+        : '<p class="small" style="padding:6px 0">시연 계정은 랭킹에서 제외돼요</p>') + '</div>';
       return gameScreen('map', body, foot);
     }
   };
@@ -448,24 +528,52 @@
     return '<div class="matrow g' + m.tier + '">' + matIcon(id) + '<div style="flex:1"><b class="gname">' + esc(m.name) + '</b><p class="small">' + fmt(have) + '개' + (m.isSpecial ? ' · 특수' : '') + '</p></div>' +
       (up ? '<button class="chip compose" data-a="composeOpen" data-v="' + up.id + '"' + (have ? '' : ' disabled') + '>' + img('icon_compose.png') + '합성</button>' : '') + '</div>';
   }
+  function medal(n) { return n <= 3 && APP_CONFIG.RANK_MEDALS ? '<span class="medal img">' + img('rank_medal_' + n + '.png') + '<b>' + n + '</b></span>' : '<span class="medal m' + (n <= 3 ? n : 0) + '"><b>' + n + '</b></span>'; }
+  function rLook(c) { return { stage: Number(c.look_stage || 0), set: Number(c.set_tier || 0) }; }
+  /** 랭커 카드: 1행 순위·닉네임·골프존 등급·합산, 2행 4캐릭터(외형·세트·전투력, 대표 ★) */
+  function rankCard(x, mine) {
+    var chars = (x.chars || []).map(function (c) {
+      var lk = rLook(c);
+      return '<div class="rch" style="--lc:' + LOOK_COLOR[lk.stage] + '">' + charPic(c.job_id, lk, 'idle', 'mini') +
+        (c.job_id === x.main_job_id ? '<i class="star">★</i>' : '') + (lk.set ? '<i class="rset">' + setLabel(lk) + '</i>' : '') +
+        '<span>' + esc(job(c.job_id).name) + '</span><b>' + fmt(c.cp) + '</b></div>';
+    }).join('');
+    return '<div class="rcard' + (x.rank <= 3 ? ' top' + x.rank : '') + (x.is_me ? ' me' : '') + (mine ? ' mine' : '') + '">' +
+      '<div class="rhead">' + medal(x.rank) + '<b class="rname">' + esc(x.nickname) + (x.is_me ? ' (나)' : '') + '</b>' + (x.grade_code ? '<span class="grd">' + esc(x.grade_code) + '</span>' : '') +
+      '<span class="rtot"><span>합산</span><b>' + fmt(x.account_cp) + '</b></span></div>' +
+      (mine ? '' : '<div class="rchars">' + chars + '</div>') + '</div>';
+  }
+  /** 1~3위 시상대: 대표 캐릭터 외형 크게(1위 가운데) */
+  function podium(top) {
+    var order = [top[1], top[0], top[2]];
+    return '<div class="podium">' + order.map(function (x) {
+      if (!x) return '<div class="pod empty"></div>';
+      var c = (x.chars || []).filter(function (c) { return c.job_id === x.main_job_id; })[0] || (x.chars || [])[0] || { job_id: 'WAR' };
+      return '<div class="pod p' + x.rank + (x.is_me ? ' me' : '') + '">' + charPic(c.job_id, rLook(c), 'idle', 'pod') + medal(x.rank) +
+        '<b class="pname">' + esc(x.nickname) + '</b><span class="pcp">' + fmt(x.account_cp) + '</span><i class="step"></i></div>';
+    }).join('') + '</div>';
+  }
   function goalCard() {
     var cp = cpOf(mainJob()), ns = nextStar(cp), rec = recommendItem();
     var head = ns ? '<b>' + ns.star + '성 사냥터까지 전투력 ' + fmt(ns.need) + '</b><div class="bar"><i style="width:' + Math.min(100, cp / ns.entry * 100) + '%"></i></div>'
       : '<b>모든 사냥터 입장 가능</b>';
+    var lg = lookGoalOf(mainJob(), S.items), me = LAST.rank && LAST.rank.me;
     return '<button class="card goal" data-a="goalCard" data-tut="goal"><span class="small" style="color:var(--gold)">다음 목표</span>' + head +
-      '<span class="small">' + (rec ? '추천 제작 · ' + esc(rec.name) + ' (+' + fmt(cpGain(rec.id)) + ')' : '추천 제작 없음') + '</span></button>';
+      '<span class="small">' + (rec ? '추천 제작 · ' + esc(rec.name) + ' (+' + fmt(cpGain(rec.id)) + ')' : '추천 제작 없음') + '</span>' +
+      '<span class="goalx">' + (lg.done ? '' : '<i style="color:' + LOOK_COLOR[lg.stage] + '">외형</i>' + esc(lg.kind === 'stage' ? LOOK_NAME[lg.stage] + '까지 ' + lg.need + '부위' : lg.short)) +
+      (me && me.rank > 1 ? '<i class="rk">랭킹</i>' + me.rank + '위 · ' + (me.next_gap ? (me.rank - 1) + '위까지 ' + fmt(me.next_gap) : (me.rank - 1) + '위와 동점') : me && me.rank === 1 ? '<i class="rk">랭킹</i>1위' : '') + '</span></button>';
   }
   /** 받을 수 있는 미션 보상 수(완료·미수령). 사냥터 화면이 보일 때 30초마다 뒤에서 갱신 */
   function missionReady() {
     var d = LAST.missions; if (!d || !d.missions) return 0;
     return d.missions.filter(function (x) { return x.done && !x.claimed; }).length;
   }
-  var missionAt = 0;
+  var missionAt = 0, claimAt = 0;
   function missionRefresh(force) {
     if (!S || (!force && Date.now() - missionAt < 30000)) return;
-    missionAt = Date.now();
+    missionAt = Date.now(); var t0 = Date.now();
     Api.call('missions', {}, { read: true }).then(function (res) {
-      if (!res.ok || !S) return;
+      if (!res.ok || !S || claimAt >= t0) return; // 요청 뒤에 보상을 받았으면 지난 값이므로 버림
       var before = missionReady(); LAST.missions = res.data;
       if (popup && popup.type === 'missions') popup.data = res.data;
       if (missionReady() !== before && (view.name === 'map' || (popup && popup.type === 'missions'))) render();
@@ -570,6 +678,7 @@
           (l.have < l.need ? '<span class="short">' + (l.need - l.have) + ' 부족</span>' + src : '<span class="short ok">충분</span>') + '</div>';
       };
       return '<div class="overlay"><div class="sheet"><div class="row" style="justify-content:flex-start">' + itemIcon(p.id) + '<div style="flex:1"><b style="font-size:18px">' + esc(it.name) + '</b><p class="sub">' + GRADE_NAME[it.grade] + ' · ' + job(it.jobId).name + ' · ' + partName(it.partId) + '</p></div></div>' +
+        (function () { var lb = lookBadge(p.id); return lb ? '<div class="lookbadge">' + charPic(it.jobId, lookOf(it.jobId), 'idle', 'mini') + '<b>' + esc(lb) + '</b></div>' : ''; })() +
         '<div class="cpcmp"><span>전투력</span><b>' + fmt(cpNow) + '</b><span>→</span><b style="color:' + (gain > 0 ? '#2E8B57' : '#4A5650') + '">' + fmt(cpNow + Math.max(0, gain)) + '</b><span class="small">' + (gain > 0 ? '+' + fmt(gain) : '현재 장착이 더 높음') + '</span></div>' +
         '<b class="small">기본 재료</b>' + lines.filter(function (l) { return !l.special; }).map(row).join('') +
         (rc.specialMaterialId ? '<b class="small">특수 재료</b>' + lines.filter(function (l) { return l.special; }).map(row).join('') : '<p class="small">일반·고급 장비는 사냥 재료만으로 만들어요</p>') +
@@ -635,10 +744,10 @@
           ((g.special || []).map(function (s) { return matName(s.materialId).replace('균열 ', '') + ' ' + s.min + '~' + s.max; }).join(', ') || '없음') + '</td></tr>';
       }).join('');
       var hunt = M.huntTiers.filter(function (t) { return t.specialDropProb > 0; }).map(function (t) { return t.star + '성 ' + (t.specialDropProb * 100).toFixed(3).replace(/0+$/, '') + '%'; }).join(' · ');
-      return '<div class="overlay"><div class="sheet"><b>확률 안내</b><p class="sub">상자 등급별 재료 단계(1~5단계, %)·장비·특수 재료</p><div class="sc"><table style="font-size:12px"><tr><th>상자</th><th>재료 단계</th><th>장비</th><th>특수 재료</th></tr>' + rows + '</table></div>' +
+      return '<div class="overlay" data-a="overlayClose"><div class="sheet">' + sheetHead('<b>확률 안내</b>') + '<p class="sub">상자 등급별 재료 단계(1~5단계, %)·장비·특수 재료</p><div class="sc"><table style="font-size:12px"><tr><th>상자</th><th>재료 단계</th><th>장비</th><th>특수 재료</th></tr>' + rows + '</table></div>' +
         '<p class="sub">사냥 균열 파편: ' + hunt + ' (5분마다, 사냥 효율 적용)</p>' +
         '<p class="sub">특수 재료는 상자 기본 내용에 더해지고 난이도·인원 보너스는 적용되지 않아요</p>' +
-        '<p class="sub">제작 대성공: 일반·고급 10%, 희귀 8%, 영웅 6%, 전설 5% · SP 배율 1.2~2.0배</p><button class="btn ghost" data-a="close">닫기</button></div></div>';
+        '<p class="sub">제작 대성공: 일반·고급 10%, 희귀 8%, 영웅 6%, 전설 5% · SP 배율 1.2~2.0배</p></div></div>';
     },
     /* GM-07 전투력 도움말 */
     cpHelp: function () {
@@ -658,8 +767,17 @@
         return '<div class="mission' + (all ? ' all' : '') + (m.claimed ? ' got' : '') + '"><div style="flex:1"><b>' + esc(m.name) + '</b><p class="small">' + (m.event_type === 'HUNT_MINUTES' ? '누적 사냥 ' + prog + '/' + m.target + '분' : prog + '/' + m.target) + ' · 보상 ' + esc(rw(m.reward)) + '</p>' +
           '<div class="bar" style="height:6px"><i style="width:' + (prog / m.target * 100) + '%"></i></div></div>' + btn + '</div>';
       }).join('');
-      return '<div class="overlay"><div class="sheet"><div class="row"><div class="row" style="gap:8px">' + img('icon_mission.png', 'cicon') + '<b style="font-size:18px">일일 미션</b></div><span class="small">매일 00:00 초기화</span></div>' + body +
-        '<p class="small">레이드 참여는 선택 · 6개 중 5개를 완료하면 올클리어</p><button class="btn ghost" data-a="close">닫기</button></div></div>';
+      return '<div class="overlay" data-a="overlayClose"><div class="sheet">' + sheetHead('<div class="row" style="gap:8px">' + img('icon_mission.png', 'cicon') + '<b style="font-size:18px">일일 미션</b></div><span class="small">매일 00:00 초기화</span>') + body +
+        '<p class="small">레이드 참여는 선택 · 6개 중 5개를 완료하면 올클리어</p></div></div>';
+    },
+    /* v0.6 외형 진화·세트 달성(B-33·B-41) */
+    evolve: function (p) {
+      var up = p.to.stage > p.from.stage, title = up ? josa(job(p.job).name, '이', '가') + ' ' + LOOK_NAME[p.to.stage] + ' 외형으로 진화했어요!' : LOOK_NAME[p.to.stage] + ' ' + setLabel(p.to) + ' 달성!';
+      return '<div class="overlay center"><div class="sheet evolve" style="align-items:center;text-align:center">' +
+        '<div class="evostage">' + charPic(p.job, p.from, 'idle', 'from') + '<i class="evoflash"></i>' + charPic(p.job, p.to, 'idle', 'to') + '</div>' +
+        '<b style="font-size:19px;color:' + ['#4A5650', '#3A4A42', '#2E8B57', '#2F6FD0', '#7A4BD8', '#B5720F'][p.to.stage] + '">' + esc(title) + '</b>' +
+        '<p class="sub">랭킹·레이드에서 다른 골퍼에게 이 모습이 보여요</p>' +
+        '<button class="btn gold" data-a="rank">랭킹 보기</button><button class="btn ghost" data-a="close">확인</button></div></div>';
     },
     /* 튜토리얼 완료 */
     tutDone: function (p) {
@@ -809,6 +927,11 @@
   var hiddenTaps = [];
   var A = {
     home: function () { go('launcher'); },
+    raidBanner: function () {
+      if (D.round && D.er && D.sim) { if (D.sim.finished) go('dgResult'); else A.dgResumeRing(); return; }
+      var id = (S.active_round || {}).round_id || (D.round && D.round.round_id); if (!id) return;
+      dgResume(id).then(function (ok) { if (ok) dgOpenRound(); else { S.active_round = null; toast('진행 중인 레이드가 없어요'); render(); } });
+    },
     gameHintOff: function () { TUT.gameHintOff = true; render(); },
     gzMy: function () { popup = { type: 'confirm', title: S.member.nickname + '님', text: '시연용 테스트 계정으로 로그인 중이에요. 로그아웃할까요?', yes: '로그아웃', no: '닫기', run: function () { A.logout(); } }; render(); },
     launcherScreen: function () { if (S.member.intro_seen !== 'Y') { go('intro'); return; } A.dgLoginOpen(); },
@@ -848,14 +971,15 @@
     },
     missions: function () {
       popup = { type: 'missions', data: LAST.missions || null }; render(); // 지난 값을 먼저 보여 주고 새 값으로 바꿈
+      var t0 = Date.now();
       Api.call('missions', {}, { read: true }).then(function (res) {
-        if (!popup || popup.type !== 'missions') return;
+        if (!popup || popup.type !== 'missions' || (res.ok && claimAt >= t0)) return;
         if (!res.ok) { if (!popup.data) popup = null; toast(res.error.message); render(); return; }
         LAST.missions = popup.data = res.data; render();
       });
     },
     missionClaim: function (d, el) {
-      el.disabled = true;
+      el.disabled = true; claimAt = Date.now();
       var ms = popup && popup.type === 'missions' && popup.data && (popup.data.missions || []).filter(function (x) { return x.mission_id === d.v; })[0];
       if (ms && ms.done && !ms.claimed) { // 보상은 기준 데이터로 정해져 있으므로 바로 반영
         var r0 = ms.reward || {}; ms.claimed = true; ms.claimed_at = new Date(now()).toISOString();
@@ -918,13 +1042,13 @@
     },
     equip: function (d) {
       // 화면에 먼저 반영하고 서버 확정은 뒤에서(실패 시 다시 불러옴)
-      var x = S.items.filter(function (i) { return i.inv_item_id === d.v; })[0], it = IX.item[x.item_id], before = cpOf(it.jobId);
+      var x = S.items.filter(function (i) { return i.inv_item_id === d.v; })[0], it = IX.item[x.item_id], before = cpOf(it.jobId), lb = lookOf(it.jobId);
       S.items.forEach(function (i) { var t = IX.item[i.item_id]; if (i.equipped_job_id === it.jobId && t.partId === it.partId) i.equipped_job_id = ''; });
       x.equipped_job_id = it.jobId;
       var cp = cpOf(it.jobId), c = charOf(it.jobId); if (c) c.cp = cp;
       CPFX = { job: it.jobId, from: before, to: cp, at: Date.now() };
       popup = null; toast(job(it.jobId).name + ' 전투력 ' + fmt(before) + ' → ' + fmt(cp) + '!');
-      tutDone(5); go('char', { job: it.jobId });
+      tutDone(5); var tp = popup; popup = null; lookCheck(it.jobId, lb); var evo = popup; go('char', { job: it.jobId }); if (tp || evo) { popup = tp || evo; render(); } // go()가 팝업을 지우므로 화면 전환 뒤 다시 띄움(튜토리얼 안내가 먼저)
       act('equip', { inv_item_id: d.v }).then(function (res) {
         if (!res.ok) { toast(res.error.message); reload().then(render); return; }
         if (pendingWrites === 0) { S.characters = res.data.characters; S.member.account_cp = res.data.account_cp; }
@@ -1007,6 +1131,21 @@
       if (view.name === 'hunt' || view.name === 'map') render();
     });
   }
+  /** GM-07 외형 카드: 현재 외형 크게 + 세트 진행(4·6·8) + 다음 외형 실루엣 (B-30·B-33) */
+  function lookCard(j) {
+    var lk = lookOf(j), L = M.lookStage || { minParts: 4, setParts: [6, 8] }, marks = [L.minParts].concat(L.setParts), max = marks[marks.length - 1];
+    var nextStage = Math.min(5, lk.stage + 1), G = lookGoalOf(j, S.items), have = G.kind === 'stage' ? G.have : 0, goal = G.text;
+    return '<div class="card lookcard"><div class="lookstage">' + charPic(j, lk, 'idle', 'big') +
+      (lk.stage < 5 ? '<div class="nextlook" title="다음 외형">' + charPic(j, { stage: nextStage, set: 0 }, 'idle', 'sil') + '<span>다음 외형</span></div>' : '') + '</div>' +
+      '<div class="row"><b style="color:' + LOOK_COLOR[lk.stage] + '">' + LOOK_NAME[lk.stage] + ' 외형</b>' + (lk.set ? '<span class="setbadge">' + setLabel(lk) + '</span>' : '') + '<span class="small" style="flex:1;text-align:right">' + esc(goal) + '</span></div>' +
+      '<div class="setbar">' + marks.map(function (m) { return '<i class="' + (lk.stage && lk.count >= m ? 'on' : '') + '" style="left:' + (m / max * 100) + '%"><b>' + m + '</b></i>'; }).join('') + '<u style="width:' + Math.min(100, (lk.stage ? lk.count : have) / max * 100) + '%"></u></div>' +
+      '<p class="small">같은 등급 4부위 = 외형 변경 · 6세트·8세트 = 효과 추가. 랭킹·레이드에서 다른 골퍼에게 이 모습이 보여요</p></div>';
+  }
+  /** 장착 변화로 외형·세트가 오르면 진화 팝업(B-33) */
+  function lookCheck(j, before) {
+    var after = lookOf(j); rankAt = 0;
+    if (after.stage > before.stage || (after.stage === before.stage && after.set > before.set)) popup = { type: 'evolve', job: j, from: before, to: after };
+  }
   /** 상자 내용(서버가 레이드 종료 때 확정해 둔 값)으로 개봉 결과를 미리 만듦 */
   function chestLocal(c) {
     var con = c.contents; if (typeof con === 'string') { try { con = JSON.parse(con); } catch (e) { con = null; } }
@@ -1066,7 +1205,9 @@
   }
 
   root.addEventListener('click', function (e) {
+    if (e.target.classList && e.target.classList.contains('overlay') && e.target.getAttribute('data-a') === 'overlayClose') { popup = null; render(); return; }
     var el = e.target.closest('[data-a]'); if (!el || el.disabled) return;
+    if (el.getAttribute('data-a') === 'overlayClose') return; // 시트 안쪽 클릭은 무시
     var f = A[el.getAttribute('data-a')]; if (f) { e.preventDefault(); f(el.dataset, el); }
   });
   root.addEventListener('submit', function (e) {
@@ -1077,7 +1218,7 @@
     view.p = { id: id, busy: true }; render();
     Api.login(id, pw).then(function (res) {
       if (!res.ok) { view.p = { id: id, err: res.error.message }; render(); return; }
-      setSave(res.data.save); TUT.replay = false; go('launcher'); dgRestore();
+      setSave(res.data.save); TUT.replay = false; go('launcher'); dgRestore(); preloadLooks();
     });
   });
   // 인트로: 컷 등장·진행 점·마지막 컷에서만 [모험 시작]
@@ -1162,12 +1303,26 @@
     dgShow(idx); render(); dgAnimate(idx - 1, prev);
     if (D.sim.finished) dgSync({});
   }
+  /** 레이드 공격자 등장(B-35): 직업·외형 공격 그림 + 머리 위 이름표(닉네임·골프존 등급·세트), 1.6초 후 퇴장. 동시에 1명 */
+  function attacker(fx, slot, strong, finish) {
+    var p = D.round.participants[slot]; if (!p) return;
+    fx.querySelectorAll('.attacker').forEach(function (x) { x.remove(); });
+    var lk = { stage: Number(p.look_stage || 0), set: Number(p.set_tier || 0) };
+    spawn(fx, '<div class="attacker' + (slot === 0 ? ' me' : '') + (strong ? ' strong' : '') + (finish ? ' finish' : '') + '">' +
+      '<span class="nameplate"><b>' + esc(p.nickname) + '</b><i>' + esc(p.grade_code || '') + '</i>' + (lk.set ? '<em>' + setLabel(lk) + '</em>' : '') + '</span>' +
+      charPic(p.job_id, lk, 'atk') + '</div>', 1700);
+    if (slot === 0 && !finish) { // 내 샷: SP 흡수 빛(fx_sp_gain)이 SP 막대로 들어감
+      spawn(fx, '<img class="spgain" src="' + asset('fx_sp_gain.png') + '" alt="" onerror="this.remove()">', 1300);
+      var sw = root.querySelector('.spwrap'); if (sw) { sw.classList.remove('gain'); void sw.offsetWidth; sw.classList.add('gain'); }
+    }
+  }
   /** 이벤트 연출: 샷 = 클럽 궤적 + 피격 + 실제 피해 d / 홀 종료 = 피니시 + E (E=0이면 '피니시 없음') */
   function dgAnimate(i, prev) {
     var ev = dgPlan().events[i], box = root.querySelector('.bossbox'), fx = box && box.querySelector('.fxlayer'); if (!fx) return;
     box.classList.remove('hit'); void box.offsetWidth;
     if (ev.type === 'SHOT') {
       var s = D.sim.shots[D.sim.shots.length - 1];
+      attacker(fx, s.slot, s.quality === 'CRIT'); // B-35: 샷을 친 플레이어의 캐릭터가 등장해 공격
       spawn(fx, '<img class="clubfx" src="' + asset('fx_club_' + CLUB_FILE[s.club] + '.png') + '" alt="" onerror="this.remove()">', 700);
       setTimeout(function () {
         box.classList.add('hit');
@@ -1178,6 +1333,7 @@
       var hres = D.sim.holes[D.sim.holes.length - 1], me = hres.players[0], jb = D.round.participants[0].job_id;
       var party = hres.players.reduce(function (a, x) { return a + x.E; }, 0);
       if (me.E >= 0.5) {
+        attacker(fx, 0, me.sp_used, true);
         spawn(fx, '<img class="finishfx" src="' + asset('fx_finish_' + JOB_FILE[jb] + '.png') + '" alt="" onerror="this.remove()">', 1300);
         setTimeout(function () { box.classList.add('hit'); spawnFloat(fx, '피니시 -' + fmtR(me.E) + (me.sp_used ? ' · SP ×' + me.sp_mult : ''), 'finish'); }, 350);
       } else spawnFloat(fx, '피니시 없음', 'blocked small');
@@ -1226,7 +1382,7 @@
   }
   /** 로그인 직후 진행 중 레이드 조용히 불러오기(상단 레이드 링·DG-00 이어 보기) */
   function dgRestore() {
-    var id = dgSaved(); if (!id) return;
+    var id = dgSaved() || (S && S.active_round && S.active_round.round_id); if (!id) return; // 서버가 알려 준 진행 중 레이드도 복원(B-39)
     dgResume(id).then(function (ok) { if (ok) { dgSchedule(); if (view.name !== 'boot') render(); } });
   }
   /** 다른 화면에 있을 때 레이드 완료: 결과 확정 + 토스트(B-19) */
@@ -1242,7 +1398,7 @@
     });
   }
   function dgFinished(data) {
-    D.result = data.result; D.bonusDone = false; dgSave(null);
+    D.result = data.result; D.bonusDone = false; dgSave(null); if (S) S.active_round = null;
     if (data.wallet) S.wallet = data.wallet;
     D.chests = data.result.chest ? [data.result.chest] : [];
     if (data.result.chest && !S.chests.some(function (c) { return c.chest_id === data.result.chest.chest_id; })) S.chests.push(data.result.chest);
@@ -1268,11 +1424,13 @@
           return '<div class="row hrow"><span>' + esc(nickOf(x.slot)) + (x.slot === 0 ? ' (나)' : '') + '</span><span class="small">' + esc(x.result) + ' ' + x.strokes + '타</span><b>' + (x.E >= 0.5 ? '피니시 ' + fmtR(x.E) : '<span class="small">피니시 없음</span>') + (x.sp_used ? ' <i class="spx">SP ×' + x.sp_mult + '</i>' : '') + '</b></div>';
         }).join('') + '</div>';
     }
-    var s = sim.shots[sim.shots.length - 1], m = shotMetrics(s), mine = s.slot === 0;
-    return '<div class="card shotcard q-' + s.quality + (mine ? ' mine' : '') + '" data-tut="shotcard"><div class="row"><span class="gslabel">GS 샷데이터 수신</span><span class="small">' + esc(nickOf(s.slot)) + (mine ? ' (나)' : '') + ' · ' + s.seq + '번째 샷</span></div>' +
-      '<div class="row" style="justify-content:flex-start;gap:10px">' + '<div class="clubic">' + img('icon_club_' + CLUB_FILE[s.club] + '.png') + '</div>' +
-      '<div style="flex:1"><b>' + esc(s.club_name) + (s.holeout ? ' · 홀아웃!' : '') + '</b><div class="metrics">' + m.map(function (x) { return '<span><i>' + x[0] + '</i><b>' + x[1] + '</b></span>'; }).join('') + '</div></div>' +
-      '<div class="verdict"><b class="qn">' + QUALITY_NAME[s.quality] + '</b><b class="dd">' + (s.d < 0.5 ? '막힘' : '-' + fmtR(s.d)) + '</b><span class="small">SP +' + s.sp_gain + '</span></div></div></div>';
+    var s = sim.shots[sim.shots.length - 1], m = shotMetrics(s), mine = s.slot === 0, pp = D.round.participants[s.slot] || {};
+    // B-36: 왼쪽 = GS 샷데이터(누가·무엇을), 오른쪽 = 레이드 적용(입힌 피해·판정·SP)
+    return '<div class="card shotcard v6 q-' + s.quality + (mine ? ' mine' : '') + '" data-tut="shotcard"><div class="gsside">' +
+      '<div class="gshead"><span class="gslabel">GS 샷데이터 수신</span><b class="who">' + esc(nickOf(s.slot)) + (mine ? ' (나)' : '') + '</b><span class="grd">' + esc(pp.grade_code || '') + '</span><span class="seq">' + s.seq + '번째 샷</span></div>' +
+      '<div class="row" style="justify-content:flex-start;gap:8px"><div class="clubic">' + img('icon_club_' + CLUB_FILE[s.club] + '.png') + '</div><b>' + esc(s.club_name) + (s.holeout ? ' · 홀아웃!' : '') + '</b></div>' +
+      '<div class="metrics">' + m.map(function (x) { return '<span><i>' + x[0] + '</i><b>' + x[1] + '</b></span>'; }).join('') + '</div></div>' +
+      '<div class="raidside"><span class="lbl">입힌 피해</span><b class="dd">' + (s.d < 0.5 ? '막힘' : '-' + fmtR(s.d)) + '</b><b class="qn">' + QUALITY_NAME[s.quality] + '</b><span class="spg">SP +' + s.sp_gain + '</span></div></div>';
   }
   function spState() {
     var me = D.sim.players[0], loc = D.spLocal;
@@ -1357,17 +1515,17 @@
 
     /* DG-02 입장 대기 */
     dgLobby: function () {
-      var me = { nickname: S.member.nickname, job: D.job || mainJob(), cp: cpOf(D.job || mainJob()), grade: S.member.grade_code };
-      var list = [me].concat(D.guests.map(function (id) { var g = IX.guest[id]; return { guest: id, nickname: g.nickname, job: g.jobId, cp: g.cp, grade: g.gradeCode }; }));
+      var me = { nickname: S.member.nickname, job: D.job || mainJob(), cp: cpOf(D.job || mainJob()), grade: S.member.grade_code, look: lookOf(D.job || mainJob()) };
+      var list = [me].concat(D.guests.map(function (id) { var g = IX.guest[id]; return { guest: id, nickname: g.nickname, job: g.jobId, cp: g.cp, grade: g.gradeCode, look: Engine.lookByCp(M, g.cp) }; }));
       var cards = list.map(function (p, i) {
-        return '<div class="card' + (i === 0 ? ' hl' : '') + '"><div class="row"><b>' + esc(p.nickname) + (i === 0 ? ' (나)' : '') + '</b><span class="badge" style="background:var(--card2)">' + esc(job(p.job).name) + '</span></div>' +
+        return '<div class="card lobbycard' + (i === 0 ? ' hl' : '') + '">' + charPic(p.job, p.look, 'idle', 'mini') + '<div style="flex:1;display:flex;flex-direction:column;gap:6px"><div class="row"><b>' + esc(p.nickname) + (i === 0 ? ' (나)' : '') + '</b><span class="badge" style="background:var(--card2)">' + esc(job(p.job).name) + '</span></div>' +
           '<div class="row"><span class="sub">' + (i === 0 ? '' : '<i class="gsin">GS 수신</i> 게스트 · ') + esc(p.grade) + ' · 전투력 ' + fmt(p.cp) + ' · ' + esc(job(p.job).role) + '</span>' +
-          (i === 0 ? '<button class="chip" data-a="dgJobSheet">캐릭터 변경</button>' : '<button class="chip" data-a="dgGuestDel" data-v="' + p.guest + '">삭제</button>') + '</div></div>';
+          (i === 0 ? '<button class="chip" data-a="dgJobSheet">캐릭터 변경</button>' : '<button class="chip" data-a="dgGuestDel" data-v="' + p.guest + '">삭제</button>') + '</div></div></div>';
       }).join('');
       var jobsIn = partyJobs(list.map(function (p) { return { job_id: p.job }; }));
       var missing = JOBS.filter(function (j) { return !jobsIn[j]; }).map(function (j) { return job(j).role; });
       return dgScreen('<div class="row"><b style="font-size:18px">입장 대기 · ' + list.length + '/6명</b><button class="chip" data-a="dgClose">화면 닫기</button></div>' +
-        '<div class="gsrecv"><i class="live"></i><b>GS에서 동반자 수신</b><span class="small">같은 방에서 스크린로그인한 동반자가 여기에 들어와요</span></div>' +
+        '<div class="gsrecv"><i class="live"></i><b>GS에서 동반자 수신</b><span class="small">같은 방에서 스크린로그인한 동반자가 여기에 들어와요 · 같은 파티에게 내 캐릭터 모습이 보여요</span></div>' +
         cards + (list.length < 6 ? '<button class="btn purple pulsebtn" data-a="dgGuestAdd">+ 게스트 추가 (가상 동반자)</button>' : '') +
         '<p class="small">직업 구성 보너스: 서로 다른 직업 ' + Object.keys(jobsIn).length + '개' + (missing.length ? ' · 파티에 없는 역할: ' + missing.join(', ') : ' · 4직업 모두 참여') + '</p>' +
         '<div style="flex:1"></div><button class="btn" data-a="dgNext"' + (D.busy ? ' disabled' : '') + '>' + (D.busy ? '레이드 준비 중…' : '다음 (참가자 확인)') + '</button>' +
@@ -1389,7 +1547,7 @@
         '<div class="bossbox"><img src="' + bossImg(r.boss.id) + '" alt="" onerror="this.remove()"><div class="bossname">' + esc(r.boss.name) + '</div></div>' +
         '<p class="sub" style="text-align:center">"' + esc(r.boss.line) + '"</p>' +
         '<ol class="gsflow">' + flow.map(function (f, i) { return '<li style="animation-delay:' + (i * 0.45) + 's"><span class="k">' + f[0] + '</span><b>' + f[1] + '</b><span class="small">' + f[2] + '</span></li>'; }).join('') + '</ol>' +
-        '<div class="card"><b>참가 ' + r.participants.length + '명 · 구성 보너스 +' + Math.round(r.job_bonus * 100) + '%</b><p class="sub">' + r.participants.map(function (p) { return esc(p.nickname) + '(' + job(p.job_id).name + ')'; }).join(' · ') + '</p>' +
+        '<div class="card"><b>참가 ' + r.participants.length + '명 · 구성 보너스 +' + Math.round(r.job_bonus * 100) + '%</b><div class="partyfaces">' + r.participants.map(function (p) { return '<div>' + charPic(p.job_id, { stage: Number(p.look_stage || 0), set: Number(p.set_tier || 0) }, 'idle', 'mini') + '<span>' + esc(p.nickname) + '</span></div>'; }).join('') + '</div>' +
         '<p class="small">보스 스킬: 1·4·7·10·13·16번 홀마다 무작위 발동 · 자동치기 샷당 ' + r.timing.shot_seconds + '초 · 홀 종료 ' + r.timing.hole_end_seconds + '초</p></div>' +
         '<div style="flex:1"></div><button class="btn purple" data-a="dgStart"' + (D.busy ? ' disabled' : '') + '>' + (D.busy ? '시작 중…' : '레이드 시작') + '</button><p class="small" style="text-align:center">시작 후에는 참가자·캐릭터를 바꿀 수 없어요</p>');
     },
@@ -1408,7 +1566,7 @@
         (skill ? '<p style="color:#9CC7EE;font-size:13px">' + SKILL_TEXT[skill](pj) + ' · ' + skillLeft(hole) + '</p>' : '') + '</div>' +
         shotCard() + partyList(),
         { foot: '<div class="dgfoot">' + spButton() + '<div class="row" style="gap:8px"><button class="btn ghost sm" data-a="dgLog">로그 보기</button><button class="btn ghost sm" data-a="dgScore">스코어카드</button>' +
-          (sim.finished ? '<button class="btn gold sm" data-a="dgFinish">결과 보기</button>' : '<button class="btn ghost sm" data-a="dgNextHole">다음 홀</button>') + '</div></div>', tabs: false });
+          (sim.finished ? '<button class="btn gold sm" data-a="dgFinish">결과 보기</button>' : '') + '</div></div>', tabs: false });
     },
 
     /* DG-06 라운드 결과·보상: 기여 막대·순위·특수 재료 미리보기 */
@@ -1424,7 +1582,8 @@
         '<div class="stack"><i class="s1" style="width:' + (shotSum / tot * 100) + '%"></i><i class="s2" style="width:' + (holeSum / tot * 100) + '%"></i></div>' +
         '<div class="row small"><span><i class="lg s1"></i>샷 공격 ' + Math.round(shotSum / tot * 100) + '%</span><span><i class="lg s2"></i>홀 종료 공격 ' + Math.round(holeSum / tot * 100) + '%</span></div></div>' +
         '<div class="card"><b>기여 순위</b>' + ps.sort(function (a, b) { return b.damage - a.damage; }).map(function (p, i) {
-          return '<div class="crow"><b class="rno">' + (i + 1) + '</b><span style="flex:1">' + esc(r ? nickOf(p.slot) : '#' + p.slot) + (p.slot === 0 ? ' (나)' : '') + '</span><span class="small">' + fmt(p.damage) + ' · ' + Math.round(p.damage / tot * 100) + '%</span>' +
+          var pp = r && r.participants[p.slot];
+          return '<div class="crow"><b class="rno">' + (i + 1) + '</b>' + (pp ? charPic(pp.job_id, { stage: Number(pp.look_stage || 0), set: Number(pp.set_tier || 0) }, 'idle', 'mini') : '') + '<span style="flex:1">' + esc(r ? nickOf(p.slot) : '#' + p.slot) + (p.slot === 0 ? ' (나)' : '') + '</span><span class="small">' + fmt(p.damage) + ' · ' + Math.round(p.damage / tot * 100) + '%</span>' +
             '<div class="stack thin"><i class="s1" style="width:' + (p.shot_damage / tot * 100) + '%"></i><i class="s2" style="width:' + (p.hole_damage / tot * 100) + '%"></i></div></div>';
         }).join('') + '</div>' +
         '<div class="card g' + g + '" style="border:2px solid var(--gc)"><div class="row" style="justify-content:flex-start"><img class="chesticon" src="' + asset('chest_' + g + '_closed.png') + '" alt="" onerror="this.remove()"><div><b class="gname" style="font-size:18px">' + esc(x.grade_name) + ' 상자 1개</b>' +
@@ -1488,9 +1647,9 @@
         return '<button class="logrow hole" data-a="dgLogRow" data-v="' + x.k + '"><span><b>' + H.hole + 'H 홀 종료</b> · ' + H.players.map(function (p) { return esc(nickOf(p.slot)) + ' ' + esc(p.result) + ' 피니시 ' + fmtR(p.E) + (p.sp_used ? ' · SP ×' + p.sp_mult : ''); }).join(' / ') + '</span>' +
           (open ? H.players.map(function (p) { return '<span class="calc">' + esc(nickOf(p.slot)) + ': 목표 ' + fmtR(p.T) + ' − 샷 기본 몫 ' + fmtR(p.settle) + ' − 이월 ' + fmtR(p.carry_in) + ' = 피니시 ' + fmtR(p.E) + (p.carry_out >= 0.5 ? ' · 다음 홀로 이월 ' + fmtR(p.carry_out) : '') + '</span>'; }).join('') : '') + '</button>';
       }).join('');
-      return '<div class="overlay"><div class="sheet logsheet"><div class="row"><b>이벤트 로그</b><span class="small">행을 누르면 계산 근거</span></div>' +
+      return '<div class="overlay" data-a="overlayClose"><div class="sheet logsheet">' + sheetHead('<b>이벤트 로그</b><span class="small">행을 누르면 계산 근거</span>') +
         '<p class="small"><i class="lg s1"></i>샷 이벤트 <i class="lg s2"></i>홀 종료 이벤트 · 샷 기본 몫·목표·이월은 계산에만 쓰는 장부값이고 보스 HP에는 실제 피해만 반영돼요</p>' +
-        (html || '<p class="sub">아직 이벤트가 없어요</p>') + '<button class="btn ghost" data-a="close">닫기</button></div></div>';
+        (html || '<p class="sub">아직 이벤트가 없어요</p>') + '</div></div>';
     },
     /* DG-05 스코어카드: 피해 보기 = 샷 피해 + 홀 종료 공격 = 합계, 이월 표시 */
     dgScore: function () {
@@ -1507,11 +1666,11 @@
         return fmtR(sim.players[slot].damage);
       };
       var hs = []; for (var h = 1; h <= 18; h++) hs.push(h);
-      return '<div class="overlay"><div class="sheet"><div class="row"><b>스코어카드</b><div class="chips"><button class="chip' + (mode === 'golf' ? ' on' : '') + '" data-a="dgScoreMode" data-v="golf">골프 점수</button><button class="chip' + (mode === 'dmg' ? ' on' : '') + '" data-a="dgScoreMode" data-v="dmg">파티 피해</button></div></div>' +
+      return '<div class="overlay" data-a="overlayClose"><div class="sheet">' + sheetHead('<b>스코어카드</b>', '<div class="chips"><button class="chip' + (mode === 'golf' ? ' on' : '') + '" data-a="dgScoreMode" data-v="golf">골프 점수</button><button class="chip' + (mode === 'dmg' ? ' on' : '') + '" data-a="dgScoreMode" data-v="dmg">파티 피해</button></div>') +
         '<div class="sc"><table><tr><th class="fix">이름</th>' + hs.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '<th>합계</th></tr>' +
         '<tr><th class="fix small">PAR</th>' + hs.map(function (h) { return '<td class="small">' + r.course.par[h - 1] + '</td>'; }).join('') + '<td></td></tr>' +
         r.participants.map(function (p) { return '<tr><th class="fix">' + esc(p.nickname) + '</th>' + hs.map(function (h) { return cell(p.slot, h); }).join('') + '<td><b>' + tot(p.slot) + '</b></td></tr>'; }).join('') +
-        '</table></div><p class="small">' + (mode === 'dmg' ? '칸 = 합계 / 샷 피해 + 홀 종료 공격 · ↪ = 다음 홀로 이월(장부값)' : '이름 열 고정, 옆으로 밀어서 보기') + ' · 파티 피해 합계 ' + fmtR(sim ? sim.total : 0) + '</p><button class="btn ghost" data-a="close">닫기</button></div></div>';
+        '</table></div><p class="small">' + (mode === 'dmg' ? '칸 = 합계 / 샷 피해 + 홀 종료 공격 · ↪ = 다음 홀로 이월(장부값)' : '이름 열 고정, 옆으로 밀어서 보기') + ' · 파티 피해 합계 ' + fmtR(sim ? sim.total : 0) + '</p></div></div>';
     },
     /* CM-02 모의 결제 */
     dgBuy: function (p) {
@@ -1570,7 +1729,9 @@
       act('roundCreate', { guest_ids: D.guests, job_id: D.job || mainJob() }).then(function (res) {
         D.busy = false;
         if (!res.ok) { toast(res.error.message); render(); return; }
-        D.er = null; D.result = null; dgApply(res.data.round); dgSave(D.round.round_id); go('dgReady');
+        D.er = null; D.result = null; dgApply(res.data.round); dgSave(D.round.round_id); S.active_round = { round_id: D.round.round_id, status: 'READY' };
+        D.round.participants.forEach(function (p) { var im = new Image(); im.src = APP_CONFIG.LOOK_IMAGES ? charStage(p.job_id, Number(p.look_stage || 0), true) : charFallback(p.job_id, true); }); // 첫 샷 전에 공격 그림 미리(G)
+        go('dgReady');
       });
     },
     dgStart: function () {
@@ -1578,7 +1739,9 @@
       Api.call('roundSync', { round_id: D.round.round_id, start: true }, { read: true }).then(function (res) {
         D.busy = false;
         if (!res.ok) { toast(res.error.message); render(); return; }
-        dgApply(res.data.round); dgOpenRound();
+        dgApply(res.data.round);
+        // 응답 전에 다른 화면으로 나갔으면 끌어오지 않고 뒤에서 진행(홈 배너·레이드 링으로 복귀)
+        if (view.name === 'dgReady') dgOpenRound(); else { dgSchedule(); render(); }
       });
     },
     dgSp: function (d, el) {
@@ -1711,7 +1874,7 @@
     M = m; IX = Engine.index(M);
     if (!saveP) { go('login'); return; }
     saveP.then(function (res) {
-      if (res.ok) { Api.state.version = res.save_version; setSave(res.data); go('launcher'); dgRestore(); } else { popup = null; Api.logout(); go('login'); }
+      if (res.ok) { Api.state.version = res.save_version; setSave(res.data); go('launcher'); dgRestore(); preloadLooks(); } else { popup = null; Api.logout(); go('login'); }
     });
   }, function () { root.innerHTML = '<div class="screen" style="padding:24px"><p>기준 데이터를 불러오지 못했어요. 새로고침해 주세요.</p></div>'; });
 })();

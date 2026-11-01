@@ -68,6 +68,25 @@ var Engine = (function () {
   function accountCp(M, invItems) {
     return M.jobs.reduce(function (a, j) { return a + characterCp(M, j.id, invItems); }, 0);
   }
+  /** 외형 단계·세트 효과(v0.6 B-30, C-2): 등급 g 이상 장비가 minParts(4)부위면 외형 g(0 기본~5 전설),
+   *  현재 외형 등급 이상 부위 수가 setParts[k](6, 8…) 이상이면 세트 k+1. 부위가 늘면 setParts만 늘리면 됨 */
+  function lookOf(M, jobId, invItems) {
+    var L = M.lookStage || { minParts: 4, setParts: [6, 8] }, ix = index(M), grades = [];
+    invItems.forEach(function (it) {
+      if (it.equipped_job_id === jobId && !it.sold_at && ix.item[it.item_id]) grades.push(ix.item[it.item_id].grade);
+    });
+    var stage = 0;
+    for (var g = 5; g >= 1; g--) if (grades.filter(function (x) { return x >= g; }).length >= L.minParts) { stage = g; break; }
+    var n = stage ? grades.filter(function (x) { return x >= stage; }).length : 0, set = 0;
+    L.setParts.forEach(function (p, k) { if (stage && n >= p) set = k + 1; });
+    return { stage: stage, set: set, count: n, parts: grades.length };
+  }
+  /** 게스트처럼 장비 정보가 없는 참가자: 전투력 구간으로 외형 추정(기획 시트에서 바꿀 수 있음) */
+  function lookByCp(M, cp) {
+    var t = (M.lookStage && M.lookStage.guestCp) || [0, 400, 800, 1500, 2400, 3500], s = 0;
+    t.forEach(function (v, i) { if (cp >= v) s = i; });
+    return { stage: s, set: 0 };
+  }
   /** 현재 전투력으로 쓸 수 있는 최고 스킬 (R-30: 매번 계산) */
   function topSkill(M, jobId, cp) {
     var best = null;
@@ -595,7 +614,7 @@ var Engine = (function () {
     setupRound: setupRound, simulateRound: simulateRound, indexAt: indexAt, eventEndMs: eventEndMs, skillAtHole: skillAtHole,
     buildPlan: buildPlan, judgeShot: judgeShot, clubSequence: clubSequence, shotExp: shotExp, accountCp: accountCp,
     holeResult: holeResult, rewardGradeByRatio: rewardGradeByRatio, finalRewardGrade: finalRewardGrade,
-    chestContents: chestContents, zoneOf: zoneOf, settingsScore: settingsScore
+    chestContents: chestContents, zoneOf: zoneOf, settingsScore: settingsScore, lookOf: lookOf, lookByCp: lookByCp
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;

@@ -209,8 +209,8 @@ details summary { cursor: pointer; }
 .stage.atk .mob { animation: mobhit .4s ease-out; }
 @keyframes mobhit { 30% { transform: translateX(8px); filter: brightness(1.6); } }
 .fxlayer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.sprite { position: absolute; right: 26px; bottom: 30px; width: 96px; height: 96px; background: url(../assets/fx_hit.png) 0 0 / 384px 96px no-repeat; animation: sprite .4s steps(4) forwards; }
-.sprite.crit { background-image: url(../assets/fx_crit.png); width: 120px; height: 120px; background-size: 480px 120px; animation-name: spritec; }
+.sprite { position: absolute; right: 26px; bottom: 30px; width: 96px; height: 96px; background: url(../assets/fx_hit.webp) 0 0 / 384px 96px no-repeat; animation: sprite .4s steps(4) forwards; }
+.sprite.crit { background-image: url(../assets/fx_crit.webp); width: 120px; height: 120px; background-size: 480px 120px; animation-name: spritec; }
 @keyframes sprite { to { background-position: -384px 0; } }
 @keyframes spritec { to { background-position: -480px 0; } }
 .dmg { position: absolute; top: 30%; font-size: 20px; font-weight: 800; color: #FFF3D0; text-shadow: 0 2px 4px #000, 0 0 8px #000; white-space: nowrap; animation: dmgup 1.1s ease-out forwards; transform: translateX(-50%); }
@@ -286,7 +286,7 @@ details summary { cursor: pointer; }
 /* 희귀 연출(B-07): fx_rare_drop을 마스크로 등급색 빛기둥 */
 .rare { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; border: 2px solid var(--gc); overflow: hidden; background: #0B171222; }
 .rare > *:not(.pillar) { position: relative; }
-.pillar { position: absolute; left: -27px; top: -70px; width: 130px; height: 220px; background: var(--gc); -webkit-mask: url(../assets/fx_rare_drop.png) center / contain no-repeat; mask: url(../assets/fx_rare_drop.png) center / contain no-repeat; animation: pillar 1.4s ease-in-out infinite alternate; opacity: .9; }
+.pillar { position: absolute; left: -27px; top: -70px; width: 130px; height: 220px; background: var(--gc); -webkit-mask: url(../assets/fx_rare_drop.webp) center / contain no-repeat; mask: url(../assets/fx_rare_drop.webp) center / contain no-repeat; animation: pillar 1.4s ease-in-out infinite alternate; opacity: .9; }
 .rare.big { flex-direction: row; padding: 14px; }
 .rare.big .pillar { left: -30px; width: 150px; height: 260px; top: -90px; }
 @keyframes pillar { from { transform: scaleY(.85); opacity: .55; } to { transform: scaleY(1.1); opacity: 1; } }
@@ -511,3 +511,189 @@ details summary { cursor: pointer; }
 .huntnow .hn-name { font-size: 16px; color: #fff; line-height: 1.3; }
 .huntnow .hn-sub { font-size: 11.5px; color: #CFE3D6; }
 .huntnow .bar { height: 7px; }
+
+/* ===================== v0.6 비주얼 고도화 (P0) ===================== */
+/* 외형 단계 그림 + 세트 효과 층. --lc = 단계 테마색 */
+.look { position: relative; display: inline-block; }
+.hfig .look { position: absolute; inset: 0; }
+.look img { position: relative; z-index: 1; }
+.hfig .look img { position: absolute; }
+.look .setfx { position: absolute; left: 50%; bottom: -2%; width: 120%; height: 34%; transform: translateX(-50%); z-index: 0; pointer-events: none; opacity: 0; }
+.look.st1 .setfx, .look.st2 .setfx { opacity: 1; border-radius: 50%; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--lc) 70%, transparent) 0%, color-mix(in srgb, var(--lc) 25%, transparent) 45%, transparent 70%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lc) 60%, transparent) inset; animation: setspin 4s linear infinite; }
+.look.st1 img, .look.st2 img { filter: drop-shadow(0 0 3px var(--lc)) drop-shadow(0 4px 4px #0006); }
+.look.st2::before { content: ''; position: absolute; left: 10%; right: 10%; top: -6%; bottom: 4%; z-index: 0; pointer-events: none; border-radius: 40% 40% 20% 20%;
+  background: linear-gradient(to top, color-mix(in srgb, var(--lc) 55%, transparent), transparent 85%); filter: blur(6px); animation: aurapulse 1.8s ease-in-out infinite; }
+.look.st2::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background-image:
+  radial-gradient(circle, var(--lc) 0 1.6px, transparent 2.4px), radial-gradient(circle, #fff 0 1.2px, transparent 2px);
+  background-size: 28px 36px, 41px 47px; background-position: 6px 0, 18px 10px; animation: rise 2.4s linear infinite; opacity: .8;
+  -webkit-mask-image: linear-gradient(to top, #000 30%, transparent 90%); mask-image: linear-gradient(to top, #000 30%, transparent 90%); }
+@keyframes setspin { from { transform: translateX(-50%) rotate(0deg) scaleY(.35); } to { transform: translateX(-50%) rotate(360deg) scaleY(.35); } }
+@keyframes aurapulse { 0%, 100% { opacity: .55; } 50% { opacity: .95; } }
+@keyframes rise { from { background-position: 6px 0, 18px 10px; } to { background-position: 6px -72px, 18px -84px; } }
+/* 단계 그림이 아직 없을 때(자리표시): 기존 그림에 단계별 색 처리 */
+.look.ph.ls0 img { filter: grayscale(.85) brightness(.92) drop-shadow(0 4px 4px #0006); }
+.look.ph.ls1 img { filter: saturate(.55) sepia(.25) drop-shadow(0 4px 4px #0006); }
+.look.ph.ls3 img { filter: hue-rotate(-40deg) saturate(1.2) drop-shadow(0 0 4px #4A9BFF) drop-shadow(0 4px 4px #0006); }
+.look.ph.ls4 img { filter: hue-rotate(20deg) saturate(1.3) drop-shadow(0 0 5px #A77BFF) drop-shadow(0 4px 4px #0006); }
+.look.ph.ls5 img { filter: sepia(.45) saturate(1.6) hue-rotate(-12deg) brightness(1.08) drop-shadow(0 0 6px #F6C445) drop-shadow(0 4px 4px #0006); }
+.look.mini { width: 44px; height: 52px; flex: none; }
+.look.mini img { width: 100%; height: 100%; object-fit: contain; }
+.look.mini .setfx { height: 30%; }
+
+/* GM-07 외형 카드 */
+.lookcard { gap: 8px; }
+.lookstage { position: relative; height: 200px; border-radius: 14px; background: radial-gradient(circle at 50% 80%, #3B2C7A, #1A1440 75%); display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+.look.big { width: 170px; height: 190px; }
+.look.big img { width: 100%; height: 100%; object-fit: contain; }
+.nextlook { position: absolute; right: 8px; bottom: 8px; width: 62px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.nextlook .look.sil { width: 56px; height: 66px; }
+.nextlook .look.sil img { width: 100%; height: 100%; object-fit: contain; filter: brightness(0) drop-shadow(0 0 2px #ffffff88) !important; opacity: .7; }
+.nextlook span { font-size: 10px; color: #CFC6FF; }
+.setbadge { font-size: 11px; font-weight: 800; color: #1B2620; background: var(--gold); border-radius: 8px; padding: 1px 7px; }
+.setbar { position: relative; height: 8px; border-radius: 4px; background: #ffffff22; margin: 10px 4px 14px; }
+.setbar u { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: linear-gradient(90deg, var(--gold), #FFE08A); text-decoration: none; }
+.setbar i { position: absolute; top: -4px; width: 2px; height: 16px; background: #ffffff55; transform: translateX(-1px); z-index: 1; font-style: normal; }
+.setbar i.on { background: var(--gold); }
+.setbar i b { position: absolute; top: 17px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--sub); }
+
+/* 진화 팝업 */
+.evostage { position: relative; height: 170px; width: 100%; display: flex; align-items: flex-end; justify-content: center; border-radius: 14px; background: radial-gradient(circle at 50% 75%, #3B2C7A, #120E2A 75%); overflow: hidden; }
+.evostage .look { position: absolute; bottom: 4px; width: 140px; height: 160px; }
+.evostage .look img { width: 100%; height: 100%; object-fit: contain; }
+.evostage .look.from { animation: evofrom 1.4s forwards; }
+.evostage .look.to { opacity: 0; animation: evoto 1.4s forwards; }
+.evoflash { position: absolute; inset: 0; background: radial-gradient(circle, #fff 0, #fff8 25%, transparent 60%); opacity: 0; animation: evoflash 1.4s forwards; z-index: 3; }
+@keyframes evofrom { 0%, 40% { opacity: 1; } 55%, 100% { opacity: 0; } }
+@keyframes evoto { 0%, 50% { opacity: 0; transform: scale(.9); } 70% { opacity: 1; transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes evoflash { 0%, 35% { opacity: 0; } 50% { opacity: 1; } 80%, 100% { opacity: 0; } }
+
+/* 바텀시트 상단 고정 헤더(B-37) */
+.sheethead { position: sticky; top: -18px; z-index: 5; margin: -18px -16px 0; padding: 14px 12px 10px 16px; background: #F8FAF5; border-bottom: 1px solid #E3E8DF; display: flex; align-items: center; gap: 8px; border-radius: 20px 20px 0 0; }
+.sheethead .sh-t { flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sheethead .sh-x { flex: none; width: 34px; height: 34px; border-radius: 17px; border: 0; background: #E3E8DF; color: #1B2620; font-size: 16px; font-weight: 700; }
+.sheethead .chips { flex: none; }
+
+/* DG-04 샷 카드 재배치(B-36) */
+.shotcard.v6 { display: flex; flex-direction: row; gap: 10px; align-items: stretch; }
+.shotcard.v6 .gsside { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.shotcard.v6 .gshead { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.shotcard.v6 .gshead .who { font-size: 14px; }
+.shotcard.v6 .gshead .grd { font-size: 11px; color: #CFE3D6; background: #ffffff1a; border-radius: 6px; padding: 1px 6px; }
+.shotcard.v6 .gshead .seq { font-size: 11px; color: var(--sub); }
+.shotcard.v6 .raidside { flex: none; width: 96px; border-left: 1px dashed #ffffff33; padding-left: 10px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; text-align: right; }
+.shotcard.v6 .raidside .lbl { font-size: 11px; color: var(--sub); }
+.shotcard.v6 .raidside .dd { font-size: 22px; color: #FF8A6B; line-height: 1.1; }
+.shotcard.v6.q-CRIT .raidside .dd { color: #FFC24A; }
+.shotcard.v6 .raidside .qn { font-size: 13px; }
+.shotcard.v6 .raidside .spg { font-size: 11px; color: #CDBFFF; }
+
+/* DG-04 공격자 등장(B-35) */
+.bossbox .fxlayer .attacker { position: absolute; left: 4%; bottom: 6px; width: 104px; height: 128px; z-index: 6; animation: atkin 1.6s ease-out forwards; }
+.bossbox .fxlayer .attacker .look { position: absolute; inset: 0; }
+.bossbox .fxlayer .attacker .look img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: contain; animation: none !important; }
+.bossbox .fxlayer .attacker .nameplate { position: absolute; left: 50%; top: -20px; transform: translateX(-50%); white-space: nowrap; z-index: 7; display: flex; gap: 4px; align-items: center;
+  background: #0B1712E6; border: 1px solid #ffffff44; border-radius: 10px; padding: 2px 7px; font-size: 11px; color: #fff; }
+.bossbox .fxlayer .attacker .nameplate i { font-style: normal; color: #CFE3D6; font-size: 10px; }
+.bossbox .fxlayer .attacker .nameplate em { font-style: normal; font-size: 10px; font-weight: 800; color: #1B2620; background: var(--gold); border-radius: 6px; padding: 0 4px; }
+.bossbox .fxlayer .attacker.me .nameplate { border-color: var(--gold); color: var(--gold); }
+.bossbox .fxlayer .attacker.strong .look img { filter: drop-shadow(0 0 6px #FFC24A) !important; }
+.bossbox .fxlayer .attacker.finish { width: 124px; height: 150px; }
+@keyframes atkin { 0% { opacity: 0; transform: translateX(-60px); } 22% { opacity: 1; transform: translateX(0); } 40% { transform: translateX(46px); } 55% { transform: translateX(30px); } 82% { opacity: 1; transform: translateX(26px); } 100% { opacity: 0; transform: translateX(18px); } }
+
+/* 파티 얼굴(DG-02·03·06) */
+.lobbycard { flex-direction: row !important; align-items: center; gap: 10px; }
+.partyfaces { display: flex; flex-wrap: wrap; gap: 8px; }
+.partyfaces > div { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: var(--sub); width: 52px; text-align: center; }
+.crow .look.mini { width: 30px; height: 36px; }
+
+/* GZ-02 진행 중 레이드 배너(B-39) */
+.gzm-raidbar { margin: 4px 14px 2px; height: 46px; border: 0; border-radius: 8px; background: #2F3646; color: #fff; display: flex; align-items: center; gap: 10px; padding: 0 14px; font: inherit; font-size: 14px; text-align: left; }
+.gzm-raidbar b { flex: 1; font-weight: 700; }
+.gzm-raidbar .dot { width: 9px; height: 9px; border-radius: 50%; background: #F04E4E; box-shadow: 0 0 0 0 #F04E4E88; animation: livedot 1.4s infinite; }
+.gzm-raidbar span { font-size: 18px; }
+@keyframes livedot { 0% { box-shadow: 0 0 0 0 #F04E4E88; } 100% { box-shadow: 0 0 0 8px #F04E4E00; } }
+
+/* ===================== v0.6 P1 ===================== */
+/* B-34 전설 장비 테두리 빛 */
+.icon.g5 { box-shadow: 0 0 0 1px #F6C44588, 0 0 10px #F6C44566; animation: legendglow 2.2s ease-in-out infinite; }
+@keyframes legendglow { 0%, 100% { box-shadow: 0 0 0 1px #F6C44566, 0 0 6px #F6C44544; } 50% { box-shadow: 0 0 0 1px #F6C445cc, 0 0 14px #F6C445aa; } }
+
+/* B-33 GM-05 외형 배지, GM-01 다음 목표 줄 */
+.lookbadge { display: flex; align-items: center; gap: 8px; background: linear-gradient(90deg, #2A1F5C, #1B2E26); border: 1px solid #A77BFF66; border-radius: 12px; padding: 4px 10px 4px 4px; }
+.lookbadge .look.mini { width: 36px; height: 42px; }
+.lookbadge b { font-size: 13px; color: #E9E2FF; }
+.goalx { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--sub); }
+.goalx:empty { display: none; }
+.goalx i { font-style: normal; font-size: 10px; font-weight: 800; border: 1px solid currentColor; border-radius: 6px; padding: 0 4px; margin-right: 4px; }
+.goalx i.rk { color: var(--gold); }
+.rankpos { font-size: 12px; color: var(--gold); font-weight: 700; margin: 0; }
+
+/* B-40 랭킹 */
+.ranknote { font-size: 12px; color: #CFC6FF; background: #2A1F5C88; border-radius: 10px; padding: 8px 10px; margin: 0; }
+.podium { display: grid; grid-template-columns: 1fr 1.18fr 1fr; align-items: end; gap: 6px; margin: 4px 0 2px; }
+.pod { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.pod .look.pod { width: 74px; height: 86px; }
+.pod.p1 .look.pod { width: 96px; height: 112px; }
+.pod .look.pod img { width: 100%; height: 100%; object-fit: contain; }
+.pod .medal { margin-top: -10px; position: relative; z-index: 3; }
+.pod .pname { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pod .pcp { font-size: 12px; color: var(--gold); font-weight: 800; }
+.pod .step { display: block; width: 100%; border-radius: 8px 8px 0 0; margin-top: 3px; background: linear-gradient(#2F3E37, #1B2A23); }
+.pod.p1 .step { height: 34px; background: linear-gradient(#6B5320, #2E2410); }
+.pod.p2 .step { height: 22px; background: linear-gradient(#566270, #262C33); }
+.pod.p3 .step { height: 14px; background: linear-gradient(#6A4630, #2B1D14); }
+.pod.me .pname { color: #CFC6FF; }
+.medal { flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: #ffffff14; border: 2px solid #ffffff33; }
+.medal b { font-size: 13px; }
+.medal.m1 { background: radial-gradient(circle at 35% 30%, #FFF2B8, #E2B33A 55%, #9C7414); border-color: #FFE08A; color: #3B2A00; }
+.medal.m2 { background: radial-gradient(circle at 35% 30%, #FFFFFF, #B9C3CE 55%, #6E7883); border-color: #E6ECF2; color: #1E252C; }
+.medal.m3 { background: radial-gradient(circle at 35% 30%, #FFD9B8, #C27A45 55%, #7A4520); border-color: #E8A97A; color: #2C1608; }
+.medal.img { position: relative; width: 32px; height: 32px; background: none; border: 0; }
+.medal.img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.medal.img b { position: relative; color: #2C1608; }
+.rcard { background: var(--card); border-radius: 14px; padding: 8px 10px 6px; display: flex; flex-direction: column; gap: 4px; border: 1px solid transparent; }
+.rcard.top1 { border-color: #F6C44599; background: linear-gradient(135deg, #3A2F12, var(--card) 60%); }
+.rcard.top2 { border-color: #C9D2DC77; }
+.rcard.top3 { border-color: #E8A97A77; }
+.rcard.me { border-color: var(--purple2); background: linear-gradient(135deg, #2A1F5C, var(--card) 70%); }
+.rhead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rhead .rname { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rhead .grd { font-size: 10px; color: #CFE8DA; background: #ffffff14; border-radius: 6px; padding: 1px 6px; white-space: nowrap; flex: none; }
+.rtot { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; flex: none; }
+.rtot span { font-size: 10px; color: var(--sub); }
+.rtot b { font-size: 17px; color: var(--gold); }
+.rchars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.rch { position: relative; display: flex; flex-direction: column; align-items: center; background: #0E1A15; border-radius: 10px; border-bottom: 2px solid var(--lc); padding: 2px 0 3px; min-width: 0; }
+.rch .look.mini { width: 40px; height: 46px; }
+.rch span { font-size: 10px; color: var(--sub); }
+.rch b { font-size: 12px; }
+.rch .star { position: absolute; left: 4px; top: 2px; font-style: normal; color: var(--gold); font-size: 11px; z-index: 3; }
+.rch .rset { position: absolute; right: 3px; top: 3px; font-style: normal; font-size: 9px; font-weight: 800; color: #1B2620; background: var(--lc); border-radius: 5px; padding: 0 3px; z-index: 3; }
+.rankme .rcard.mine { padding: 6px 10px; }
+.mynext { margin-top: 6px; gap: 8px; font-size: 13px; }
+.mynext b { color: var(--gold); }
+.chip.gold { background: var(--gold); color: #1B2620; font-weight: 800; border-color: var(--gold); }
+
+/* ===================== v0.6 GPT 리소스 적용 ===================== */
+/* 6세트: 발밑 문양 원(fx_set1), 8세트: + 오라 기둥(fx_set2). 흰 이펙트를 마스크로 써서 외형 단계색(--lc)을 입힘 */
+.look.st1 .setfx, .look.st2 .setfx { border-radius: 0; box-shadow: none; height: 26%; bottom: -4%; width: 118%;
+  background: color-mix(in srgb, var(--lc) 70%, #fff);
+  -webkit-mask: url(../assets/fx_set1.webp?v=0.6.1) center / contain no-repeat; mask: url(../assets/fx_set1.webp?v=0.6.1) center / contain no-repeat;
+  animation: setpulse 2.4s ease-in-out infinite; }
+@keyframes setpulse { 0%, 100% { opacity: .75; transform: translateX(-50%) scale(.96); } 50% { opacity: 1; transform: translateX(-50%) scale(1.04); } }
+.look.st2::before { left: -12%; right: -12%; top: -10%; bottom: -3%; border-radius: 0; filter: none;
+  background: color-mix(in srgb, var(--lc) 65%, #fff);
+  -webkit-mask: url(../assets/fx_set2.webp?v=0.6.1) center bottom / 100% 100% no-repeat; mask: url(../assets/fx_set2.webp?v=0.6.1) center bottom / 100% 100% no-repeat; }
+/* 진화 빛 폭발 */
+.evoflash { background: url(../assets/fx_evolve.webp?v=0.6.1) center / 90% no-repeat; mix-blend-mode: screen; }
+/* 내 샷 SP 흡수 */
+.bossbox .fxlayer .spgain { position: absolute; left: 22%; bottom: -10px; width: 150px; z-index: 7; pointer-events: none; opacity: 0; transform-origin: 100% 50%;
+  filter: drop-shadow(0 0 4px #A77BFF) hue-rotate(0deg); animation: spgain 1.2s ease-in .5s forwards; }
+@keyframes spgain { 0% { opacity: 0; transform: rotate(70deg) scale(.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: rotate(95deg) translateX(-40px) scale(1); } }
+.spwrap.gain { animation: spgainbar .9s ease-out; }
+@keyframes spgainbar { 0% { box-shadow: 0 0 0 0 #A77BFF00; } 40% { box-shadow: 0 0 0 3px #A77BFF99, 0 0 16px #A77BFF; } 100% { box-shadow: 0 0 0 0 #A77BFF00; } }
+/* 랭킹 메달 이미지 */
+.medal.img { width: 34px; height: 36px; }
+.medal.img b { font-size: 12px; margin-top: -8px; text-shadow: 0 0 3px #fff; }
+.pod .medal.img { width: 40px; height: 42px; }
