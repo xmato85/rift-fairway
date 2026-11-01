@@ -679,14 +679,14 @@ details summary { cursor: pointer; }
 /* 6세트: 발밑 문양 원(fx_set1), 8세트: + 오라 기둥(fx_set2). 흰 이펙트를 마스크로 써서 외형 단계색(--lc)을 입힘 */
 .look.st1 .setfx, .look.st2 .setfx { border-radius: 0; box-shadow: none; height: 26%; bottom: -4%; width: 118%;
   background: color-mix(in srgb, var(--lc) 70%, #fff);
-  -webkit-mask: url(../assets/fx_set1.webp?v=0.6.1) center / contain no-repeat; mask: url(../assets/fx_set1.webp?v=0.6.1) center / contain no-repeat;
+  -webkit-mask: url(../assets/fx_set1.webp?v=0.6.2) center / contain no-repeat; mask: url(../assets/fx_set1.webp?v=0.6.2) center / contain no-repeat;
   animation: setpulse 2.4s ease-in-out infinite; }
 @keyframes setpulse { 0%, 100% { opacity: .75; transform: translateX(-50%) scale(.96); } 50% { opacity: 1; transform: translateX(-50%) scale(1.04); } }
 .look.st2::before { left: -12%; right: -12%; top: -10%; bottom: -3%; border-radius: 0; filter: none;
   background: color-mix(in srgb, var(--lc) 65%, #fff);
-  -webkit-mask: url(../assets/fx_set2.webp?v=0.6.1) center bottom / 100% 100% no-repeat; mask: url(../assets/fx_set2.webp?v=0.6.1) center bottom / 100% 100% no-repeat; }
+  -webkit-mask: url(../assets/fx_set2.webp?v=0.6.2) center bottom / 100% 100% no-repeat; mask: url(../assets/fx_set2.webp?v=0.6.2) center bottom / 100% 100% no-repeat; }
 /* 진화 빛 폭발 */
-.evoflash { background: url(../assets/fx_evolve.webp?v=0.6.1) center / 90% no-repeat; mix-blend-mode: screen; }
+.evoflash { background: url(../assets/fx_evolve.webp?v=0.6.2) center / 90% no-repeat; mix-blend-mode: screen; }
 /* 내 샷 SP 흡수 */
 .bossbox .fxlayer .spgain { position: absolute; left: 22%; bottom: -10px; width: 150px; z-index: 7; pointer-events: none; opacity: 0; transform-origin: 100% 50%;
   filter: drop-shadow(0 0 4px #A77BFF) hue-rotate(0deg); animation: spgain 1.2s ease-in .5s forwards; }
@@ -697,3 +697,13 @@ details summary { cursor: pointer; }
 .medal.img { width: 34px; height: 36px; }
 .medal.img b { font-size: 12px; margin-top: -8px; text-shadow: 0 0 3px #fff; }
 .pod .medal.img { width: 40px; height: 42px; }
+
+/* v0.6.2 캐릭터 빈 칸 → 제작(직업·부위 고정) */
+.card.slotfor { border: 1.5px solid var(--gold); background: linear-gradient(135deg, #3A2F12, var(--card) 70%); }
+.card.slotfor b { display: block; font-size: 16px; color: var(--gold); }
+.card.slotfor .icon { width: 46px; height: 46px; border-style: dashed; border-color: var(--gold); color: var(--gold); }
+.chips.parts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.chips.parts::-webkit-scrollbar { display: none; }
+.chips.parts .chip { flex: none; }
+.slotok { margin: 0; font-size: 13px; font-weight: 700; color: #2E8B57; }
+.slotok:empty { display: none; }

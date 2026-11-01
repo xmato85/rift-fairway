@@ -425,8 +425,8 @@
 
     /* GM-05 제작 */
     craft: function (p) {
-      var j = p.job || mainJob(), filter = p.filter || 'all', mats = S.materials, w = S.wallet, tutWeapon = tutActive() && !TUT.replay && tutCur() === 4;
-      var list = M.items.filter(function (it) { return it.jobId === j; }).map(function (it) {
+      var j = p.job || mainJob(), filter = p.filter || 'all', part = p.part || '', mats = S.materials, w = S.wallet, tutWeapon = tutActive() && !TUT.replay && tutCur() === 4;
+      var list = M.items.filter(function (it) { return it.jobId === j && (!part || it.partId === part); }).map(function (it) {
         return { it: it, short: Engine.craftShortage(M, it.id, w, mats) };
       });
       if (filter === 'can') {
@@ -438,6 +438,10 @@
       var goal = S.member.goal_item_id;
       return gameScreen('craft',
         '<div class="chips">' + JOBS.map(function (x) { return '<button class="chip' + (x === j ? ' on' : '') + '" data-a="craftJob" data-v="' + x + '">' + job(x).name + '</button>'; }).join('') + '</div>' +
+        // v0.6.2: 캐릭터 빈 칸에서 들어오면 직업·부위 고정 + 안내 카드(다른 직업·부위 잘못 제작 방지)
+        (part ? '<div class="card slotfor"><div class="row" style="justify-content:flex-start;gap:10px"><div class="icon g0"><span>' + partName(part) + '</span></div><div style="flex:1"><span class="small">캐릭터 빈 칸 장비 만들기</span><b>' + esc(job(j).name) + ' · ' + partName(part) + '</b>' +
+          (equippedAt(j, part) ? '<p class="small">지금 장착: ' + esc(IX.item[equippedAt(j, part).item_id].name) + '</p>' : '<p class="small">만들면 ' + esc(job(j).name) + '의 ' + partName(part) + ' 칸에 장착할 수 있어요</p>') + '</div></div></div>' : '') +
+        '<div class="chips parts"><button class="chip' + (!part ? ' on' : '') + '" data-a="craftPart" data-v="">전체 부위</button>' + M.parts.map(function (pt) { return '<button class="chip' + (part === pt.id ? ' on' : '') + '" data-a="craftPart" data-v="' + pt.id + '">' + pt.name + '</button>'; }).join('') + '</div>' +
         '<div class="chips"><button class="chip' + (filter === 'all' ? ' on' : '') + '" data-a="craftFilter" data-v="all">전체</button><button class="chip' + (filter === 'can' ? ' on' : '') + '" data-a="craftFilter" data-v="can">지금 만들 수 있는 것</button></div>' +
         (goal && IX.item[goal] ? '<button class="card goalline" data-a="craftDetail" data-v="' + goal + '"><span class="small">목표 장비</span><b>' + esc(IX.item[goal].name) + '</b><span class="small">›</span></button>' : '') +
         (filter === 'can' && !list.some(function (x) { return !x.short.length; }) ? '<p class="sub">지금 만들 수 있는 장비가 없어요. 사냥으로 재료를 모아 보세요.</p>' : '') +
@@ -678,6 +682,7 @@
           (l.have < l.need ? '<span class="short">' + (l.need - l.have) + ' 부족</span>' + src : '<span class="short ok">충분</span>') + '</div>';
       };
       return '<div class="overlay"><div class="sheet"><div class="row" style="justify-content:flex-start">' + itemIcon(p.id) + '<div style="flex:1"><b style="font-size:18px">' + esc(it.name) + '</b><p class="sub">' + GRADE_NAME[it.grade] + ' · ' + job(it.jobId).name + ' · ' + partName(it.partId) + '</p></div></div>' +
+        (view.name === 'craft' && view.p.part ? '<p class="slotok">' + (view.p.part === it.partId && view.p.job === it.jobId ? '✓ 선택한 칸(' + esc(job(it.jobId).name) + ' · ' + partName(it.partId) + ')에 맞는 장비예요' : '') + '</p>' : '') +
         (function () { var lb = lookBadge(p.id); return lb ? '<div class="lookbadge">' + charPic(it.jobId, lookOf(it.jobId), 'idle', 'mini') + '<b>' + esc(lb) + '</b></div>' : ''; })() +
         '<div class="cpcmp"><span>전투력</span><b>' + fmt(cpNow) + '</b><span>→</span><b style="color:' + (gain > 0 ? '#2E8B57' : '#4A5650') + '">' + fmt(cpNow + Math.max(0, gain)) + '</b><span class="small">' + (gain > 0 ? '+' + fmt(gain) : '현재 장착이 더 높음') + '</span></div>' +
         '<b class="small">기본 재료</b>' + lines.filter(function (l) { return !l.special; }).map(row).join('') +
@@ -713,7 +718,8 @@
       var list = S.items.filter(function (x) { var it = IX.item[x.item_id]; return it.jobId === p.job && it.partId === p.part && !x.equipped_job_id; });
       return '<div class="overlay"><div class="sheet"><b>' + job(p.job).name + ' · ' + partName(p.part) + '</b>' +
         (list.length ? list.map(function (x, i) { return '<button class="row card" style="background:#EEF2EA;color:#1B2620" data-a="equip" data-v="' + x.inv_item_id + '"' + (i === 0 ? ' data-tut="pickEquip"' : '') + '>' + itemIcon(x.item_id) + '<span style="flex:1;text-align:left">' + esc(IX.item[x.item_id].name) + ' · ' + fmt(x.cp) + '</span></button>'; }).join('')
-          : '<p class="sub">장착할 수 있는 장비가 없어요</p><button class="btn" data-a="tab" data-v="craft">제작하러 가기</button>') +
+          : '<p class="sub">' + esc(job(p.job).name) + '의 ' + partName(p.part) + ' 장비가 없어요</p>') +
+        '<button class="btn' + (list.length ? ' ghost' : '') + '" data-a="craftFor" data-v="' + p.part + '" data-j="' + p.job + '">' + esc(job(p.job).name) + ' ' + partName(p.part) + ' 제작하러 가기</button>' +
         '<button class="btn ghost" data-a="close">닫기</button></div></div>';
     },
     /* GM-06 재료 합성 바텀시트(5:1, 수량 스테퍼, 골드) */
@@ -1009,8 +1015,11 @@
       });
     },
     cpHelp: function () { popup = { type: 'cpHelp' }; render(); },
-    craftJob: function (d) { go('craft', { job: d.v, filter: view.p.filter }); },
-    craftFilter: function (d) { go('craft', { job: view.p.job, filter: d.v }); },
+    craftJob: function (d) { go('craft', { job: d.v, filter: view.p.filter, part: view.p.part }); },
+    craftFilter: function (d) { go('craft', { job: view.p.job, filter: d.v, part: view.p.part }); },
+    craftPart: function (d) { go('craft', { job: view.p.job, filter: view.p.filter, part: d.v || '' }); },
+    /** 캐릭터 빈 칸 → 그 직업·부위로 걸러진 제작 화면 */
+    craftFor: function (d) { popup = null; go('craft', { job: d.j, part: d.v, filter: 'all' }); },
     craftDetail: function (d) {
       var it = IX.item[d.v];
       if (it.grade >= 3 && !S.tutorial.raid_guide_seen && !tutActive()) {
