@@ -425,7 +425,8 @@
 
     /* GM-05 제작 */
     craft: function (p) {
-      var j = p.job || mainJob(), filter = p.filter || 'all', part = p.part || '', mats = S.materials, w = S.wallet, tutWeapon = tutActive() && !TUT.replay && tutCur() === 4;
+      var j = p.job || mainJob(), filter = 'all', // v0.6.3: [전체]/[지금 만들 수 있는 것] 삭제(직업·부위 필터로 대체, 정렬은 제작 가능 먼저)
+ part = p.part || '', mats = S.materials, w = S.wallet, tutWeapon = tutActive() && !TUT.replay && tutCur() === 4;
       var list = M.items.filter(function (it) { return it.jobId === j && (!part || it.partId === part); }).map(function (it) {
         return { it: it, short: Engine.craftShortage(M, it.id, w, mats) };
       });
@@ -442,7 +443,6 @@
         (part ? '<div class="card slotfor"><div class="row" style="justify-content:flex-start;gap:10px"><div class="icon g0"><span>' + partName(part) + '</span></div><div style="flex:1"><span class="small">캐릭터 빈 칸 장비 만들기</span><b>' + esc(job(j).name) + ' · ' + partName(part) + '</b>' +
           (equippedAt(j, part) ? '<p class="small">지금 장착: ' + esc(IX.item[equippedAt(j, part).item_id].name) + '</p>' : '<p class="small">만들면 ' + esc(job(j).name) + '의 ' + partName(part) + ' 칸에 장착할 수 있어요</p>') + '</div></div></div>' : '') +
         '<div class="chips parts"><button class="chip' + (!part ? ' on' : '') + '" data-a="craftPart" data-v="">전체 부위</button>' + M.parts.map(function (pt) { return '<button class="chip' + (part === pt.id ? ' on' : '') + '" data-a="craftPart" data-v="' + pt.id + '">' + pt.name + '</button>'; }).join('') + '</div>' +
-        '<div class="chips"><button class="chip' + (filter === 'all' ? ' on' : '') + '" data-a="craftFilter" data-v="all">전체</button><button class="chip' + (filter === 'can' ? ' on' : '') + '" data-a="craftFilter" data-v="can">지금 만들 수 있는 것</button></div>' +
         (goal && IX.item[goal] ? '<button class="card goalline" data-a="craftDetail" data-v="' + goal + '"><span class="small">목표 장비</span><b>' + esc(IX.item[goal].name) + '</b><span class="small">›</span></button>' : '') +
         (filter === 'can' && !list.some(function (x) { return !x.short.length; }) ? '<p class="sub">지금 만들 수 있는 장비가 없어요. 사냥으로 재료를 모아 보세요.</p>' : '') +
         list.map(function (x) {
@@ -498,8 +498,9 @@
         '<div class="card" data-tut="cp"><div class="row"><b>' + (isMain ? '현재 대표: ' : '살펴보는 캐릭터: ') + esc(job(j).name) + '</b>' + (isMain ? '<span class="lbl-warn">★ 대표</span>' : '<button class="chip" data-a="setMain" data-v="' + j + '">대표로 설정</button>') + '</div>' +
         '<div class="row" style="justify-content:flex-start;gap:6px"><span class="sub">전투력</span><b class="cpnum"' + (fx ? ' data-from="' + fx.from + '" data-count="' + fx.to + '"' : '') + '>' + fmt(cp) + '</b>' +
         (fx ? '<span class="cpup">' + fmt(fx.from) + ' → ' + fmt(fx.to) + '</span>' : '') + '<button class="info" data-a="cpHelp" aria-label="전투력 도움말">ⓘ</button></div>' +
-        '<p class="sub">스킬 ' + esc(sk.name) + ' · 역할 ' + esc(job(j).role) + '</p>' +
-        '<p class="small">' + (nsk ? '다음 스킬 「' + esc(nsk.name) + '」 전투력 ' + fmt(nsk.unlockCp) + '에 해금 (' + fmt(nsk.unlockCp - cp) + ' 남음)' : '모든 스킬 해금 완료') + '</p></div>' +
+        '<div class="skillrow"><button class="skillchip on" data-a="skillInfo" data-v="' + sk.id + '"><i>현재 스킬</i><b>' + esc(sk.name) + '</b><span>×' + sk.coef + '</span></button>' +
+        (nsk ? '<button class="skillchip next" data-a="skillInfo" data-v="' + nsk.id + '"><i>다음 스킬 · ' + fmt(nsk.unlockCp - cp) + ' 남음</i><b>' + esc(nsk.name) + '</b><span>×' + nsk.coef + '</span></button>' : '<span class="skillchip done"><i>스킬</i><b>모두 해금</b></span>') + '</div>' +
+        '<p class="small">역할 ' + esc(job(j).role) + ' · 스킬을 누르면 설명과 데미지 계수를 볼 수 있어요</p></div>' +
         '<div class="card"><div class="row"><span class="sub">계정 전투력(4직업 합)</span><b style="flex:1">' + fmt(accountCp()) + '</b><button class="chip" data-a="rank">랭킹 보기</button></div>' + (rankLine() ? '<p class="rankpos">' + rankLine() + ' · 랭커 카드에 내 4캐릭터 모습이 보여요</p>' : '') + '</div>' +
         lookCard(j) +
         '<b>장비 8부위</b><div class="grid">' + slots + '</div>' +
@@ -756,9 +757,23 @@
         '<p class="sub">제작 대성공: 일반·고급 10%, 희귀 8%, 영웅 6%, 전설 5% · SP 배율 1.2~2.0배</p></div></div>';
     },
     /* GM-07 전투력 도움말 */
+    /* v0.6.3 스킬 안내(전투력 → 스킬 해금 → 데미지 계수) */
+    skillInfo: function (p) {
+      var sk = M.skills.filter(function (x) { return x.id === p.id; })[0], j = sk.jobId, cp = cpOf(j), cur = Engine.topSkill(M, j, cp);
+      var all = M.skills.filter(function (x) { return x.jobId === j; }).sort(function (a, b) { return a.stage - b.stage; });
+      var open = cp >= sk.unlockCp, AT = { PHYS: '물리', MAGIC: '마법', MIXED: '물리+마법' };
+      var base = function (s) { return Math.round(cp * s.coef * job(j).dmgCoef); };
+      return '<div class="overlay" data-a="overlayClose"><div class="sheet skillsheet">' + sheetHead('<b style="font-size:18px">' + esc(job(j).name) + ' 스킬</b>') +
+        '<div class="skillhero ' + (open ? 'open' : 'lock') + '"><span class="stg">' + sk.stage + '단계</span><b>' + esc(sk.name) + '</b><p>' + esc(sk.fx) + '</p>' +
+        '<div class="skillstat"><div><i>공격 타입</i><b>' + (AT[sk.attackType] || sk.attackType) + '</b></div><div><i>스킬 데미지 계수</i><b>×' + sk.coef + '</b></div><div><i>' + (open ? '상태' : '해금 전투력') + '</i><b>' + (open ? (sk.id === cur.id ? '사용 중' : '해금') : fmt(sk.unlockCp)) + '</b></div></div>' +
+        (open ? '' : '<p class="need">전투력 ' + fmt(sk.unlockCp - cp) + ' 더 올리면 해금 · 레이드 기준 데미지 ' + fmt(base(cur)) + ' → <b>' + fmt(base(sk)) + '</b></p>') + '</div>' +
+        '<div class="skilluse"><b>어디에 쓰이나요?</b><p>던전 레이드에서 내 캐릭터의 <b>기준 데미지 = 전투력 × 스킬 데미지 계수</b>예요. 샷 공격과 홀 종료 피니시 피해가 모두 이 기준 데미지에서 계산돼요. 전투력이 올라 높은 단계 스킬이 열리면 같은 샷도 더 큰 피해를 줘요.</p></div>' +
+        '<div class="skilllist">' + all.map(function (x) { var o = cp >= x.unlockCp; return '<button class="' + (x.id === sk.id ? 'sel ' : '') + (o ? 'open' : 'lock') + '" data-a="skillInfo" data-v="' + x.id + '"><span>' + x.stage + '</span><b>' + esc(x.name) + '</b><i>×' + x.coef + '</i><em>' + (x.id === cur.id ? '사용 중' : o ? '해금' : fmt(x.unlockCp)) + '</em></button>'; }).join('') + '</div>' +
+        '</div></div>';
+    },
     cpHelp: function () {
       return '<div class="overlay"><div class="sheet"><b style="font-size:18px">전투력이란?</b><p>전투력이 높을수록 더 좋은 사냥터에서 더 많이 모으고, 레이드에서 보스에게 더 큰 피해를 줍니다.</p>' +
-        '<p class="sub">· 직업 전투력 = 기본 100 + 장착 장비 전투력 합<br>· 사냥터 입장: 권장 전투력의 50% 이상<br>· 사냥 효율 = (전투력 ÷ 권장)², 최대 100%<br>· 스킬 단계 해금<br>· 레이드 기준 데미지 = 전투력 × 스킬 계수</p>' +
+        '<p class="sub">· 직업 전투력 = 기본 100 + 장착 장비 전투력 합<br>· 사냥터 입장: 권장 전투력의 50% 이상<br>· 사냥 효율 = (전투력 ÷ 권장)², 최대 100%<br>· 스킬 단계 해금: 400 · 980 · 2,500 · 4,500에서 계수 ×1.4 · ×1.9 · ×2.6 · ×3.5<br>· 레이드 기준 데미지 = 전투력 × 스킬 계수</p>' +
         '<p class="sub">별 사냥터 입장 전투력: ' + M.huntTiers.map(function (t) { return t.star + '성 ' + fmt(t.entryCp); }).join(' · ') + '</p>' +
         '<button class="btn ghost" data-a="close">닫기</button></div></div>';
     },
@@ -1015,6 +1030,7 @@
       });
     },
     cpHelp: function () { popup = { type: 'cpHelp' }; render(); },
+    skillInfo: function (d) { popup = { type: 'skillInfo', id: d.v }; render(); },
     craftJob: function (d) { go('craft', { job: d.v, filter: view.p.filter, part: view.p.part }); },
     craftFilter: function (d) { go('craft', { job: view.p.job, filter: d.v, part: view.p.part }); },
     craftPart: function (d) { go('craft', { job: view.p.job, filter: view.p.filter, part: d.v || '' }); },
@@ -1333,18 +1349,18 @@
       var s = D.sim.shots[D.sim.shots.length - 1];
       attacker(fx, s.slot, s.quality === 'CRIT'); // B-35: 샷을 친 플레이어의 캐릭터가 등장해 공격
       spawn(fx, '<img class="clubfx" src="' + asset('fx_club_' + CLUB_FILE[s.club] + '.png') + '" alt="" onerror="this.remove()">', 700);
-      setTimeout(function () {
+      setTimeout(function () { // 캐릭터 돌진이 보스에 닿는 순간(약 0.6초)에 피격
         box.classList.add('hit');
         spawn(fx, '<i class="sprite ' + (s.quality === 'CRIT' ? 'crit' : 'hit') + '"></i>', 420);
         if (s.d < 0.5) spawnFloat(fx, '막힘', 'blocked'); else spawnFloat(fx, '-' + fmtR(s.d), s.quality === 'CRIT' ? 'crit' : s.quality === 'STRONG' ? 'strong' : '');
-      }, 260);
+      }, 600);
     } else {
       var hres = D.sim.holes[D.sim.holes.length - 1], me = hres.players[0], jb = D.round.participants[0].job_id;
       var party = hres.players.reduce(function (a, x) { return a + x.E; }, 0);
       if (me.E >= 0.5) {
         attacker(fx, 0, me.sp_used, true);
         spawn(fx, '<img class="finishfx" src="' + asset('fx_finish_' + JOB_FILE[jb] + '.png') + '" alt="" onerror="this.remove()">', 1300);
-        setTimeout(function () { box.classList.add('hit'); spawnFloat(fx, '피니시 -' + fmtR(me.E) + (me.sp_used ? ' · SP ×' + me.sp_mult : ''), 'finish'); }, 350);
+        setTimeout(function () { box.classList.add('hit'); spawnFloat(fx, '피니시 -' + fmtR(me.E) + (me.sp_used ? ' · SP ×' + me.sp_mult : ''), 'finish'); }, 600);
       } else spawnFloat(fx, '피니시 없음', 'blocked small');
       if (party - me.E >= 0.5) setTimeout(function () { spawnFloat(fx, '파티 피니시 -' + fmtR(party - me.E), 'party'); }, 650);
     }
@@ -1570,7 +1586,7 @@
       var head = sim.finished ? '<b>18홀 종료</b>' : '<b>' + hole + 'H · PAR ' + par + '</b><span class="sub" id="dgNext">' + nextLabel() + '</span>';
       return dgScreen(
         '<div class="row raidtop">' + head + '<span class="simbadge">시뮬레이션</span></div>' +
-        '<div class="bossbox raid"><img src="' + bossImg(r.boss.id) + '" alt="" onerror="this.remove()"><div class="bossname">' + esc(r.boss.name) + '</div><div class="fxlayer"></div></div>' +
+        '<div class="bossbox raid"><div class="bossfig"><img class="bidle" src="' + bossImg(r.boss.id) + '" alt="" onerror="this.remove()"><img class="bhit" src="' + bossImg(r.boss.id, true) + '" alt="" onerror="this.remove()"></div><div class="bossname">' + esc(r.boss.name) + '</div><div class="fxlayer"></div></div>' +
         '<div class="card" style="background:#2A1A14"><div class="row"><span>HP</span><b>' + fmtR(sim.boss_hp_left) + ' / ' + fmt(r.boss.hp_max) + (sim.killed_at ? ' · ' + sim.killed_at + 'H 처치!' : '') + '</b></div><div class="bar hp"><i style="width:' + hpPct + '%"></i></div>' +
         (skill ? '<p style="color:#9CC7EE;font-size:13px">' + SKILL_TEXT[skill](pj) + ' · ' + skillLeft(hole) + '</p>' : '') + '</div>' +
         shotCard() + partyList(),
