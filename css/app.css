@@ -757,3 +757,78 @@ details summary { cursor: pointer; }
 .skilllist button em { font-style: normal; font-size: 11px; color: #5D6B63; }
 .skilllist button.lock { opacity: .6; }
 .skilllist button.sel { border: 2px solid #B5720F; background: #FBF3DD; }
+
+/* ===== v1.0 ===== */
+/* B-59 가독성: 본문 14~16px, 버튼 48px 이상 */
+.sub { font-size: 14px; line-height: 1.5; }
+.small { font-size: 13px; line-height: 1.45; }
+.chip { min-height: 40px; padding: 8px 14px; font-size: 14px; }
+.chip.src { min-height: 34px; }
+.btn.sm { min-height: 48px; }
+.tabs button { font-size: 14px; }
+.topbar .who, .topbar .gold { font-size: 15px; }
+.map .pin .pn { font-size: 13px; }
+/* 대표 캐릭터 선택 */
+.jobsel { background: radial-gradient(circle at 50% 0%, #2A1F5C, var(--bg) 60%); }
+.jobsel .scroll { padding-bottom: 24px; }
+.jobtabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.jobtab { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border-radius: 12px; background: var(--card); border: 2px solid transparent; min-height: 96px; }
+.jobtab.on { border-color: var(--gold); background: var(--card2); }
+.jobtab b { font-size: 15px; } .jobtab span { font-size: 12px; color: var(--sub); }
+.jobtab .charpic, .jobtab img { max-height: 54px; }
+.jobcard { gap: 8px; display: flex; flex-direction: column; }
+.looksteps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; text-align: center; }
+.looksteps > div { display: flex; flex-direction: column; align-items: center; font-size: 12px; font-weight: 700; }
+.looksteps img { max-height: 58px; }
+.skillmini { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.skillmini > div { display: flex; align-items: center; gap: 6px; background: #ffffff0d; border-radius: 8px; padding: 6px 8px; font-size: 13px; }
+.skillmini i { font-style: normal; width: 20px; height: 20px; border-radius: 50%; background: var(--purple); text-align: center; font-size: 12px; line-height: 20px; flex-shrink: 0; }
+.skillmini b { flex: 1; } .skillmini span { color: var(--mute); font-size: 12px; }
+.rolefx { background: #ffffff0d; border-radius: 8px; padding: 8px; color: var(--sub); }
+/* 지도 핀 주재료 */
+.pin .pfam { display: flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; color: #FFE7A8; }
+.pin .pfam img { width: 16px; height: 16px; }
+.pin[data-tut=jobregion] { border-color: var(--gold); }
+/* 오늘 할 일 */
+.today { display: flex; flex-direction: column; gap: 6px; }
+.todo { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px; border-radius: 10px; background: #ffffff0a; text-align: left; }
+.todo b { font-size: 15px; min-width: 112px; } .todo span { flex: 1; font-size: 13px; color: var(--sub); } .todo i { font-style: normal; color: var(--mute); }
+.todo.hot { background: #E2C46A22; border: 1px solid #E2C46A66; } .todo.hot b { color: var(--gold); }
+.tabs .upb { position: absolute; top: 4px; right: calc(50% - 28px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #E0604F; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; line-height: 18px; }
+/* 사냥 가득 · PUSH 미리보기 */
+.fullbanner { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: linear-gradient(90deg, #6A3A10, #3A2E10); border: 1px solid #E2C46A; text-align: left; animation: pulseb 1.6s infinite; }
+.fullbanner img { width: 36px; height: 36px; } .fullbanner div { flex: 1; display: flex; flex-direction: column; } .fullbanner b { color: var(--gold); font-size: 15px; } .fullbanner span { font-size: 13px; color: var(--sub); } .fullbanner i { font-style: normal; font-weight: 700; color: var(--gold); }
+@keyframes pulseb { 50% { box-shadow: 0 0 0 4px #E2C46A33; } }
+.fullnote { text-align: center; color: var(--gold); font-size: 14px; font-weight: 700; }
+.pushpv { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 40; display: flex; gap: 10px; padding: 10px 12px; border-radius: 16px; background: #F4F4F6F2; color: #111; box-shadow: 0 8px 24px #0004; text-align: left; animation: pushin .5s ease-out; }
+.pushpv i { width: 38px; height: 38px; border-radius: 9px; background-size: cover; flex-shrink: 0; }
+.pushpv div { display: flex; flex-direction: column; } .pushpv span { font-size: 12px; color: #666; } .pushpv b { font-size: 15px; } .pushpv p { font-size: 13px; color: #333; }
+@keyframes pushin { from { transform: translateY(-120%); } }
+/* 던전 탭 시작 배너 · 체험 */
+.dgstart { position: relative; border-radius: 14px; padding: 16px; background-size: cover; background-position: center; display: flex; flex-direction: column; gap: 6px; min-height: 150px; }
+.dgstart b { font-size: 19px; } .dgstart p { font-size: 14px; color: #E5DCFF; max-width: 70%; }
+.dgstart .btn { margin-top: 6px; width: auto; align-self: flex-start; padding: 12px 20px; }
+.dgstart .simbadge { position: absolute; top: 12px; right: 12px; }
+.tutraid { border: 2px solid var(--purple2); }
+.tbimg { width: 72px; height: 72px; object-fit: contain; }
+.tbtip { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #F3F5EE; color: var(--ink); }
+.tbtip div { flex: 1; } .tbtip b { font-size: 15px; } .tbtip p { font-size: 13px; color: #4A5650; }
+.tbtip .pino { width: 44px; height: 44px; }
+/* 기여 배지 · SP 자동 */
+.cbadges { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.cb { display: inline-flex; align-items: center; gap: 2px; font-style: normal; font-size: 11px; padding: 2px 6px; border-radius: 8px; background: #ffffff14; color: var(--gold); }
+.cb img { width: 16px; height: 16px; } .cb em { font-style: normal; }
+.autosp { align-self: flex-end; font-size: 12px; padding: 4px 10px; border-radius: 10px; background: #ffffff14; color: var(--mute); min-height: 30px; }
+.autosp.on { color: var(--ok); }
+.gzm-sl.spot { animation: spot 1s 4; box-shadow: 0 0 0 3px #F0743A88; }
+@keyframes spot { 50% { box-shadow: 0 0 0 8px #F0743A33; transform: scale(1.06); } }
+.jobsel { background-size: cover; background-position: top center; }
+.today { position: relative; }
+.todaypino { position: absolute; right: 6px; top: -18px; width: 58px; height: 58px; pointer-events: none; }
+.today > .row { padding-right: 56px; }
+.fullbanner img { width: 44px; height: 44px; }
+.cb img { width: 20px; height: 20px; }
+.dgstart.img { padding: 0 0 14px; background: #1A1033; overflow: hidden; gap: 6px; }
+.dgstart.img .dgsimg { width: 100%; aspect-ratio: 2 / 1; object-fit: cover; display: block; margin-bottom: 4px; }
+.dgstart.img b, .dgstart.img p, .dgstart.img .btn { margin-left: 14px; margin-right: 14px; }
+.dgstart.img p { max-width: none; }

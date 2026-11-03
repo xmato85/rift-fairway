@@ -138,7 +138,7 @@ var Engine = (function () {
         var id = 'MAT-' + familyPick(M, r, course.regionId) + '-' + tier;
         out.materials[id] = (out.materials[id] || 0) + 1;
       }
-      if (r() < t.equipDropProb * eff) out.items.push(randomItem(M, r, session.job_id, t.equipGrade).id);
+      if (r() < bal(M).huntEquipProb * eff) out.items.push(randomItem(M, r, session.job_id, t.equipGrade).id); // v1.0: 완제품은 아주 희소하게
       // 균열 파편(C-3): 3~5성만, 틱당 specialDropProb × 효율
       if (t.specialDropProb > 0 && r() < t.specialDropProb * eff) out.materials[t.specialMaterialId] = (out.materials[t.specialMaterialId] || 0) + 1;
     }
@@ -576,6 +576,57 @@ var Engine = (function () {
     };
   }
 
+  // ---------- v1.0 밸런스(실연동 기준: 레이드 1회 = 1인 1시간 + 매장 비용) ----------
+  // master.json에 balance가 있으면 그 값을, 없으면 아래 기본값을 씀(기획 시트 '밸런스 v1.0' 탭과 같은 값)
+  var BAL10 = {
+    huntEquipProb: 0.0003,                                   // 사냥 5분 1회당 완제품 확률(모든 별)
+    chestQty: { 1: 15, 2: 20, 3: 25, 4: 30, 5: 40 },          // 상자 등급별 재료 수
+    chestJobShare: 0.7,                                      // 대표(참가) 직업 필요 재료 비율
+    chestTargetTierShare: 0.7,                               // 다음 제작 등급 재료 비율(나머지는 한 단계 아래)
+    chestGoldRate: { 1: 0.25, 2: 0.35, 3: 0.4, 4: 0.5, 5: 0.7 }, // 다음 등급 장비 1개 평균 골드 대비
+    chestEquipProb: { 1: 0.005, 2: 0.01, 3: 0.02, 4: 0.03, 5: 0.05 },
+    // 다음 제작 등급별 특수 재료 [재료, 최소, 최대, 확률] (상자 등급 1~5)
+    chestSpecial: {
+      3: { id: 'MAT-RIFT-3', rows: [[0, 1, 1], [0, 1, 1], [1, 1, 1], [1, 1, 1], [1, 2, 1]] },
+      4: { id: 'MAT-RIFT-4', rows: [[1, 1, 0.2], [1, 1, 0.4], [1, 1, 0.6], [1, 1, 0.8], [1, 1, 1]] },
+      5: { id: 'MAT-RIFT-5', rows: [[1, 1, 0], [1, 1, 0.2], [1, 1, 0.35], [1, 1, 0.5], [1, 1, 1]] }
+    },
+    // 대표 캐릭터 선택 시 지급(무기 1개 + 체험 사냥 뒤 첫 제작이 바로 되도록)
+    starter: { WAR: { 'MAT-IRON-1': 20, 'MAT-LEATHER-1': 10, 'MAT-CLOTH-1': 10 }, MAG: { 'MAT-IRON-1': 15, 'MAT-CLOTH-1': 20, 'MAT-LEATHER-1': 5 },
+      ARC: { 'MAT-IRON-1': 15, 'MAT-LEATHER-1': 20, 'MAT-CLOTH-1': 5 }, ROG: { 'MAT-IRON-1': 15, 'MAT-LEATHER-1': 20, 'MAT-CLOTH-1': 5 } },
+    tutorialRegion: { WAR: 'METRO', MAG: 'CHUNGCHEONG', ARC: 'GANGWON', ROG: 'JEJU' },
+    tutorialParts: ['HELM', 'ARMOR', 'GLOVES']              // 던전 체험 상자: 무기 외 일반 3부위 재료
+  };
+  function bal(M) { var b = M.balance || {}, o = {}; Object.keys(BAL10).forEach(function (k) { o[k] = b[k] !== undefined ? b[k] : BAL10[k]; }); return o; }
+  /** 다음 제작 등급: 그 직업 8부위 중 가장 낮은 장착 등급 + 1(빈 칸 = 0) */
+  function targetGrade(M, jobId, invItems) {
+    var ix = index(M), min = 5;
+    M.parts.forEach(function (pt) {
+      var g = 0; invItems.forEach(function (x) { var it = ix.item[x.item_id]; if (it && x.equipped_job_id === jobId && !x.sold_at && it.partId === pt.id && it.grade > g) g = it.grade; });
+      if (g < min) min = g;
+    });
+    return Math.min(5, min + 1);
+  }
+  /** 그 직업·등급 8부위 레시피의 재료 계열 비중 {IRON: n, ...} */
+  function jobFamilyWeights(M, jobId, grade) {
+    var ix = index(M), w = { IRON: 0, LEATHER: 0, CLOTH: 0 };
+    M.items.forEach(function (it) {
+      if (it.jobId !== jobId || it.grade !== grade) return;
+      var rc = ix.recipe[it.id], f = rc.mainMaterialId.split('-')[1];
+      if (w[f] !== undefined) w[f] += rc.mainQty;
+    });
+    return w;
+  }
+  /** 던전 체험(튜토리얼 보스) 상자: 대표 직업 일반 3부위 재료·골드 정확히(계정당 1회) */
+  function tutorialChest(M, jobId) {
+    var ix = index(M), mats = {}, gold = 0;
+    bal(M).tutorialParts.forEach(function (part) {
+      var it = M.items.filter(function (x) { return x.jobId === jobId && x.grade === 1 && x.partId === part; })[0], rc = ix.recipe[it.id];
+      mats[rc.mainMaterialId] = (mats[rc.mainMaterialId] || 0) + rc.mainQty; gold += rc.gold;
+    });
+    return { grade: 2, gold: gold, materials: mats, special: {}, items: [], tutorial: true };
+  }
+
   // ---------- 보상 (R-09, R-16, R-31) ----------
   function rewardGradeByRatio(M, ratio) {
     var g = M.rewardGrades[0];
@@ -587,23 +638,29 @@ var Engine = (function () {
     var byRatio = rewardGradeByRatio(M, ratio);
     return index(M).rewardGrade[Math.min(byRatio.grade, zone.maxRewardGrade)];
   }
-  /** 상자 내용 확정(R-31). jobIds: 참가한 내 캐릭터 직업 */
-  function chestContents(M, gradeNo, zoneId, partySize, regionId, jobId, seed) {
-    var g = index(M).rewardGrade[gradeNo], zone = M.diffZones.filter(function (z) { return z.zone === zoneId; })[0];
-    var r = rng('chest:' + seed), bonus = zone.rewardBonus + partyRow(M, partySize).rewardBonus;
-    var qty = Math.round(randInt(r, g.qtyMin, g.qtyMax) * (1 + bonus)), mats = {};
+  /** 상자 내용 확정(R-31 → v1.0): 상자 등급 × 참가 직업의 '다음 제작 등급'에 맞춘 재료·골드·특수 재료, 완제품은 희소
+   *  target: 다음 제작 등급(1~5, 없으면 2). 같은 시드 → 같은 결과 */
+  function chestContents(M, gradeNo, zoneId, partySize, regionId, jobId, seed, target) {
+    var B = bal(M), ix = index(M), r = rng('chest10:' + seed), tg = Math.max(1, Math.min(5, target || 2));
+    var zone = M.diffZones.filter(function (z) { return z.zone === zoneId; })[0] || { rewardBonus: 0 };
+    var bonus = (zone.rewardBonus || 0) + (partyRow(M, partySize).rewardBonus || 0);
+    var qty = Math.round(B.chestQty[gradeNo] * (1 + bonus)), mats = {}, w = jobFamilyWeights(M, jobId, tg), fams = Object.keys(w);
+    var wsum = fams.reduce(function (a, f) { return a + w[f]; }, 0) || 1;
     for (var i = 0; i < qty; i++) {
-      var tier = pickIndexByProb(r, g.tierProb) + 1, id = 'MAT-' + familyPick(M, r, regionId) + '-' + tier;
+      var fam;
+      if (r() < B.chestJobShare) { var x = r() * wsum; fam = fams[0]; for (var k = 0; k < fams.length; k++) { x -= w[fams[k]]; if (x < 0) { fam = fams[k]; break; } } }
+      else fam = familyPick(M, r, regionId);
+      var tier = r() < B.chestTargetTierShare || tg === 1 ? tg : tg - 1, id = 'MAT-' + fam + '-' + tier;
       mats[id] = (mats[id] || 0) + 1;
     }
-    var items = r() < g.equipDropProb ? [randomItem(M, r, jobId, g.equipGrade).id] : [];
-    // 특수 재료(C-8): 기존 내용에 더함. 난이도·인원 보너스 미적용. 기본 내용과 다른 시드라 v0.3 내용은 그대로
-    var r2s = rng('chestsp:' + seed), special = {};
-    (g.special || []).forEach(function (sp) {
-      var q = randInt(r2s, sp.min, sp.max);
-      if (q > 0) special[sp.materialId] = (special[sp.materialId] || 0) + q;
-    });
-    return { grade: gradeNo, gold: g.gold, materials: mats, special: special, items: items };
+    var itemsTg = M.items.filter(function (it) { return it.jobId === jobId && it.grade === tg; });
+    var avgGold = itemsTg.reduce(function (a, it) { return a + ix.recipe[it.id].gold; }, 0) / (itemsTg.length || 1);
+    var gold = Math.round(avgGold * B.chestGoldRate[gradeNo] / 10) * 10;
+    var items = r() < B.chestEquipProb[gradeNo] ? [randomItem(M, r, jobId, tg).id] : [];
+    var special = {}, sp = B.chestSpecial[tg];
+    if (!sp && tg <= 2 && gradeNo >= 3) sp = { id: 'MAT-RIFT-3', rows: [[0, 0, 0], [0, 0, 0], [1, 1, 0.5], [1, 1, 0.7], [1, 1, 1]] }; // 희귀 준비
+    if (sp) { var row = sp.rows[gradeNo - 1]; if (r() < row[2]) { var q = randInt(r, row[0], row[1]); if (q > 0) special[sp.id] = q; } }
+    return { grade: gradeNo, gold: gold, materials: mats, special: special, items: items, target_grade: tg, v: 10 };
   }
 
   return {
@@ -614,7 +671,7 @@ var Engine = (function () {
     setupRound: setupRound, simulateRound: simulateRound, indexAt: indexAt, eventEndMs: eventEndMs, skillAtHole: skillAtHole,
     buildPlan: buildPlan, judgeShot: judgeShot, clubSequence: clubSequence, shotExp: shotExp, accountCp: accountCp,
     holeResult: holeResult, rewardGradeByRatio: rewardGradeByRatio, finalRewardGrade: finalRewardGrade,
-    chestContents: chestContents, zoneOf: zoneOf, settingsScore: settingsScore, lookOf: lookOf, lookByCp: lookByCp
+    chestContents: chestContents, tutorialChest: tutorialChest, targetGrade: targetGrade, bal: bal, zoneOf: zoneOf, settingsScore: settingsScore, lookOf: lookOf, lookByCp: lookByCp
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
