@@ -444,7 +444,9 @@
         var can = list.filter(function (x) { return !x.short.length; });
         list = can.length ? can : list.filter(function (x) { return x.it.grade === 1; });
       }
-      list.sort(function (a, b) { return a.short.length - b.short.length || a.it.grade - b.it.grade; });
+      // v1.0.2 U2: 지금 장착하면 강해지는 장비(빈 칸 포함) → 재료 모으면 강해지는 장비 → 보유·같거나 낮은 장비 순
+      list.forEach(function (x) { x.gain = cpGain(x.it.id); x.owned = S.items.some(function (i) { return i.item_id === x.it.id; }); x.rank = x.gain > 0 ? (x.short.length ? 1 : 0) : 2; });
+      list.sort(function (a, b) { return a.rank - b.rank || a.short.length - b.short.length || a.it.grade - b.it.grade; });
       if (tutWeapon) list.sort(function (a, b) { return (b.it.grade === 1 && b.it.partId === 'WEAPON') - (a.it.grade === 1 && a.it.partId === 'WEAPON'); });
       var goal = S.member.goal_item_id;
       return gameScreen('craft',
@@ -460,8 +462,8 @@
           var spLine = lines.filter(function (l) { return l.special; })[0];
           var weapon = x.it.grade === 1 && x.it.partId === 'WEAPON';
           return '<button class="card" style="text-align:left" data-a="craftDetail" data-v="' + x.it.id + '"' + (weapon ? ' data-tut="craftWeapon"' : '') + '><div class="row" style="justify-content:flex-start">' + itemIcon(x.it.id) +
-            '<div style="flex:1"><div class="row"><b>' + esc(x.it.name) + (goal === x.it.id ? ' <span class="badge">목표</span>' : '') + '</b><span class="' + (x.short.length ? 'lbl-bad' : 'lbl-ok') + '" style="font-size:12px">' + (x.short.length ? '재료 부족' : '제작 가능') + '</span></div>' +
-            '<p class="sub">' + GRADE_NAME[x.it.grade] + ' · 전투력 +' + fmt(x.it.cp) + '</p><p class="small">' + lines.filter(function (l) { return !l.special; }).map(function (l) { return esc(matName(l.id)) + ' ' + l.have + '/' + l.need; }).join(' · ') + ' · 골드 ' + fmt(rc.gold) + '</p>' +
+            '<div style="flex:1"><div class="row"><b>' + esc(x.it.name) + (goal === x.it.id ? ' <span class="badge">목표</span>' : '') + (x.owned ? ' <span class="badge own">보유 중</span>' : '') + '</b><span class="' + (x.short.length ? 'lbl-bad' : x.gain > 0 ? 'lbl-ok' : 'lbl-mute') + '" style="font-size:12px">' + (x.short.length ? '재료 부족' : x.gain > 0 ? '업그레이드 가능' : '재제작') + '</span></div>' +
+            '<p class="sub">' + GRADE_NAME[x.it.grade] + ' · 장비 전투력 ' + fmt(x.it.cp) + ' · <span class="' + (x.gain > 0 ? 'gainup' : 'gainno') + '">' + (x.gain > 0 ? '장착 시 +' + fmt(x.gain) : x.gain === 0 ? '현재와 동일' : '현재 장비보다 낮음') + '</span></p><p class="small">' + lines.filter(function (l) { return !l.special; }).map(function (l) { return esc(matName(l.id)) + ' ' + l.have + '/' + l.need; }).join(' · ') + ' · 골드 ' + fmt(rc.gold) + '</p>' +
             (spLine ? '<p class="small spline">특수 · ' + esc(matName(spLine.id)) + ' ' + spLine.have + '/' + spLine.need + '</p>' : '') + '</div></div></button>';
         }).join(''));
     },
@@ -576,7 +578,7 @@
     return '<button class="card goal" data-a="goalCard" data-tut="goal"><span class="small" style="color:var(--gold)">다음 목표</span>' + head +
       '<span class="small">' + (rec ? '추천 제작 · ' + esc(rec.name) + ' (+' + fmt(cpGain(rec.id)) + ')' : '추천 제작 없음') + '</span>' +
       '<span class="goalx">' + (lg.done ? '' : '<i style="color:' + LOOK_COLOR[lg.stage] + '">외형</i>' + esc(lg.kind === 'stage' ? LOOK_NAME[lg.stage] + '까지 ' + lg.need + '부위' : lg.short)) +
-      (me && me.rank > 1 ? '<i class="rk">랭킹</i>' + me.rank + '위 · ' + (me.next_gap ? (me.rank - 1) + '위까지 ' + fmt(me.next_gap) : (me.rank - 1) + '위와 동점') : me && me.rank === 1 ? '<i class="rk">랭킹</i>1위' : '') + '</span></button>';
+      '</span></button>'; // v1.0.2 U3: 랭킹 격차는 랭킹 화면에서
   }
   /** 받을 수 있는 미션 보상 수(완료·미수령). 사냥터 화면이 보일 때 30초마다 뒤에서 갱신 */
   function missionReady() {
@@ -695,7 +697,7 @@
       return '<div class="overlay"><div class="sheet"><div class="row" style="justify-content:flex-start">' + itemIcon(p.id) + '<div style="flex:1"><b style="font-size:18px">' + esc(it.name) + '</b><p class="sub">' + GRADE_NAME[it.grade] + ' · ' + job(it.jobId).name + ' · ' + partName(it.partId) + '</p></div></div>' +
         (view.name === 'craft' && view.p.part ? '<p class="slotok">' + (view.p.part === it.partId && view.p.job === it.jobId ? '✓ 선택한 칸(' + esc(job(it.jobId).name) + ' · ' + partName(it.partId) + ')에 맞는 장비예요' : '') + '</p>' : '') +
         (function () { var lb = lookBadge(p.id); return lb ? '<div class="lookbadge">' + charPic(it.jobId, lookOf(it.jobId), 'idle', 'mini') + '<b>' + esc(lb) + '</b></div>' : ''; })() +
-        '<div class="cpcmp"><span>전투력</span><b>' + fmt(cpNow) + '</b><span>→</span><b style="color:' + (gain > 0 ? '#2E8B57' : '#4A5650') + '">' + fmt(cpNow + Math.max(0, gain)) + '</b><span class="small">' + (gain > 0 ? '+' + fmt(gain) : '현재 장착이 더 높음') + '</span></div>' +
+        '<div class="cpcmp"><span>전투력</span><b>' + fmt(cpNow) + '</b><span>→</span><b style="color:' + (gain > 0 ? '#2E8B57' : '#4A5650') + '">' + fmt(cpNow + Math.max(0, gain)) + '</b><span class="small">' + (gain > 0 ? '+' + fmt(gain) : gain === 0 ? '현재와 동일' : '현재 장비보다 낮음') + '</span></div>' +
         '<b class="small">기본 재료</b>' + lines.filter(function (l) { return !l.special; }).map(row).join('') +
         (rc.specialMaterialId ? '<b class="small">특수 재료</b>' + lines.filter(function (l) { return l.special; }).map(row).join('') : '<p class="small">일반·고급 장비는 사냥 재료만으로 만들어요</p>') +
         '<div class="mline"><span>골드</span><b style="color:' + (S.wallet.gold >= rc.gold ? '#2E8B57' : '#D64545') + '">' + fmt(S.wallet.gold) + ' / ' + fmt(rc.gold) + '</b>' + (S.wallet.gold < rc.gold ? '<span class="short">' + fmt(rc.gold - S.wallet.gold) + ' 부족</span>' : '') + '</div>' +
@@ -756,15 +758,17 @@
     },
     /* CM-02 확률표: 상자 + 특수 재료 + 사냥 파편 */
     probs: function () {
-      var rows = M.rewardGrades.map(function (g) {
-        return '<tr><td>' + GRADE_NAME[g.grade] + '</td><td>' + g.tierProb.map(function (x) { return Math.round(x * 100); }).join('/') + '</td><td>' + Math.round(g.equipDropProb * 100) + '%</td><td>' +
-          ((g.special || []).map(function (s) { return matName(s.materialId).replace('균열 ', '') + ' ' + s.min + '~' + s.max; }).join(', ') || '없음') + '</td></tr>';
+      var B = Engine.bal(M), ti = targetInfo(D.round && D.round.participants && D.round.participants[0] ? D.round.participants[0].job_id : null);
+      var rows = [1, 2, 3, 4, 5].map(function (g) {
+        return '<tr><td>' + GRADE_NAME[g] + '</td><td>' + B.chestQty[g] + '개</td><td>' + (B.chestEquipProb[g] * 100).toFixed(1).replace('.0', '') + '%</td><td>' + esc(specialText(Engine.chestSpecialRow(M, g, ti.tg))) + '</td></tr>';
       }).join('');
       var hunt = M.huntTiers.filter(function (t) { return t.specialDropProb > 0; }).map(function (t) { return t.star + '성 ' + (t.specialDropProb * 100).toFixed(3).replace(/0+$/, '') + '%'; }).join(' · ');
-      return '<div class="overlay" data-a="overlayClose"><div class="sheet">' + sheetHead('<b>확률 안내</b>') + '<p class="sub">상자 등급별 재료 단계(1~5단계, %)·장비·특수 재료</p><div class="sc"><table style="font-size:12px"><tr><th>상자</th><th>재료 단계</th><th>장비</th><th>특수 재료</th></tr>' + rows + '</table></div>' +
-        '<p class="sub">사냥 균열 파편: ' + hunt + ' (5분마다, 사냥 효율 적용)</p>' +
-        '<p class="sub">특수 재료는 상자 기본 내용에 더해지고 난이도·인원 보너스는 적용되지 않아요</p>' +
-        '<p class="sub">제작 대성공: 일반·고급 10%, 희귀 8%, 영웅 6%, 전설 5% · SP 배율 1.2~2.0배</p></div></div>';
+      return '<div class="overlay" data-a="overlayClose"><div class="sheet">' + sheetHead('<b>확률 안내</b>') +
+        '<p class="sub">상자 재료는 <b>목표 등급</b> 기준: ' + esc(job(ti.job).name) + ' 8부위 중 가장 낮은 등급 + 1 → 지금 <b>' + GRADE_NAME[ti.tg] + '</b>' + (ti.why ? ' (' + esc(ti.why) + ')' : '') + '</p>' +
+        '<p class="sub">재료 단계: 목표 등급 70% · 한 단계 아래 30% · 직업 계열 70%</p>' +
+        '<div class="sc"><table style="font-size:13px"><tr><th>상자</th><th>재료 수</th><th>완제품</th><th>특수 재료(지금 목표 기준)</th></tr>' + rows + '</table></div>' +
+        '<p class="small">재료 수는 난이도·인원 보너스로 늘어날 수 있어요 · 사냥 균열 파편: ' + hunt + ' (5분마다, 효율 적용)</p>' +
+        '<p class="small">제작 대성공: 일반·고급 10%, 희귀 8%, 영웅 6%, 전설 5% · SP 배율 1.2~2.0배</p></div></div>';
     },
     /* GM-07 전투력 도움말 */
     /* v0.6.3 스킬 안내(전투력 → 스킬 해금 → 데미지 계수) */
@@ -820,6 +824,28 @@
       return '<div class="overlay center"><div class="sheet"><b>세션 종료</b><p class="sub">' + esc(p.msg) + '</p><button class="btn" data-a="logout">다시 로그인</button></div></div>';
     }
   };
+  /** v1.0.2 F2: 상자 목표 등급과 그 이유(직업 8부위 중 가장 낮은 칸) */
+  function targetInfo(jobId) {
+    var j = jobId || mainJob(), tg = Engine.targetGrade(M, j, S.items), low = null;
+    M.parts.forEach(function (pt) { var e = equippedAt(j, pt.id), g = e ? IX.item[e.item_id].grade : 0; if (!low || g < low.g) low = { g: g, part: pt.id }; });
+    var why = !low ? '' : low.g === 0 ? '빈 칸(' + partName(low.part) + ')이 있어서' : '가장 낮은 칸이 ' + GRADE_NAME[low.g] + '(' + partName(low.part) + ')이라서';
+    return { tg: tg, why: why, job: j };
+  }
+  function specialText(row) { if (!row) return '특수 재료 없음'; return matName(row.id) + ' ' + (row.min === row.max ? row.max : row.min + '~' + row.max) + (row.prob < 1 ? ' (' + Math.round(row.prob * 100) + '%)' : ''); }
+  /** DG-06 상자 미리보기: 실제 상자 계산(목표 등급·특수 재료 표)과 같은 기준 */
+  function chestPreview(g, con, jobId) {
+    var ti = targetInfo(jobId), tg = con && con.target_grade ? con.target_grade : ti.tg, row = Engine.chestSpecialRow(M, g, tg);
+    return '<p class="small">상자 내용 미리보기 · ' + esc(job(ti.job).name) + ' 기준</p>' +
+      '<div class="chestpv"><div><i>기본 재료</i><b>' + GRADE_NAME[tg] + (tg > 1 ? ' 70% · ' + GRADE_NAME[tg - 1] + ' 30%' : '') + '</b><span>' + esc(ti.why ? '목표 ' + GRADE_NAME[tg] + ' · ' + ti.why : '') + '</span></div>' +
+      '<div><i>특수 재료</i><b>' + esc(specialText(row)) + '</b></div><div><i>완제품 장비</i><b>' + (Engine.bal(M).chestEquipProb[g] * 100).toFixed(1).replace('.0', '') + '%</b></div></div>';
+  }
+  function fmtN(n) { n = Number(n || 0); return Math.round(n * 10) % 10 ? n.toFixed(1) : String(Math.round(n)); }
+  /** 별 5칸: 채움(노랑) · 반 별 · 빈 별(회색) */
+  function starsHtml(v) {
+    v = Math.max(0, Math.min(5, Math.round(Number(v || 0) * 2) / 2)); var out = '';
+    for (var i = 1; i <= 5; i++) out += '<i class="st ' + (v >= i ? 'f' : v >= i - 0.5 ? 'h' : 'e') + '">★</i>';
+    return '<span class="stars" aria-label="' + v + '점">' + out + '</span>';
+  }
   /** 희귀 획득 연출: 등급색 빛기둥(fx_rare_drop 마스크) */
   function rareRow(grade, icon, text) {
     return '<div class="rare g' + grade + '"><i class="pillar"></i>' + icon + '<b class="gname">' + esc(text) + '</b></div>';
@@ -881,7 +907,7 @@
   /** 레이드 코치마크(DG-04 첫 레이드 1회) */
   var RAID_COACH = [
     { sel: '[data-tut=shotcard]', text: ['GS 샷데이터가 들어오면 바로 공격해요', '샷 판정에 따라 피해와 SP가 쌓여요'] },
-    { sel: '[data-tut=spbtn]', text: ['SP가 100이 되면 [특수공격]!', '이번 홀 피니시 피해가 1.2~2배가 돼요'] }
+    { sel: '[data-tut=spbtn]', text: ['SP가 100이 되면 특수공격!', '특수공격 자동이 켜져 있으면 준비되면 자동으로 써요 · 피니시 1.2~2배'] }
   ];
   function coachSpec() {
     // GZ-02 첫 진입 안내: ID/PW 로그인 후 골프존앱 메인에서 [게임] 탭으로 모험 시작(인트로를 아직 안 본 회원, v0.5 보완)
@@ -910,7 +936,7 @@
     var btns = sp.launch ? '<button class="small" data-a="gameHintOff">나중에</button><button class="chip on" data-a="enterGame">게임 탭으로</button>'
       : sp.raid ? '<button class="small" data-a="coachClose">닫기</button><button class="chip on" data-a="coachNext">' + (D.coach < RAID_COACH.length - 1 ? '다음' : '확인') + '</button>'
       : sp.replay ? '<button class="small" data-a="tutReplayEnd">닫기</button><span class="small">' + tutCur() + '/6</span><button class="chip on" data-a="tutReplayNext">' + (tutCur() < 6 ? '다음' : '완료') + '</button>'
-        : '<button class="small" data-a="tutSkip">건너뛰기</button><span class="small">' + tutCur() + '/6</span>' + (sp.ok ? '<button class="chip on" data-a="tutOk">' + sp.ok + '</button>' : '');
+        : '<button class="small" data-a="tutSkip">건너뛰기</button><span class="small">' + tutLabel() + '</span>' + (sp.go ? '<button class="chip on" data-a="' + sp.go[0] + '">' + sp.go[1] + '</button>' : '') + (sp.ok ? '<button class="chip on" data-a="tutOk">' + sp.ok + '</button>' : '');
     html += '<div class="cbubble" style="' + pos + '"><div class="coachhead">' + face(sp.face || 'pino') + '<p>' + esc(sp.text[0]) + (sp.text[1] ? '<br>' + esc(sp.text[1]) : '') + '</p></div><div class="row">' + btns + '</div></div>';
     layer.innerHTML = html; layer.setAttribute('data-k', (sp.sel || '') + (popup ? popup.type : '') + view.name);
   }
@@ -986,7 +1012,14 @@
     pickCourse: function (d) {
       var c = IX.course[d.v];
       if (!Engine.canEnterCourse(M, cpOf(mainJob()), c)) { toast('전투력이 부족해요 · 장비를 제작해 보세요'); return; }
-      if (S.hunt) { popup = { type: 'confirm', title: '사냥터 이동', text: '현재 사냥을 종료하고 보상을 받은 뒤 ' + c.name + '에서 새로 시작합니다.', yes: '보상 받고 이동', run: function () { claim(false, c.id); } }; render(); return; }
+      if (S.hunt) {
+        if (S.hunt.course_id === c.id) { go('hunt'); return; }
+        var t0 = huntTicksSafe(S.hunt), none = t0 === 0;
+        popup = { type: 'confirm', title: euro(c.name) + ' 이동할까요?',
+          text: none ? '아직 쌓인 보상이 없어요. 지금 사냥을 끝내고 ' + c.name + '에서 새로 시작해요.' : '쌓인 보상을 받고 ' + c.name + '에서 새로 시작해요.',
+          yes: none ? '보상 없이 ' + euro(c.name) + ' 이동' : '보상 받고 ' + euro(c.name) + ' 이동', no: '취소',
+          run: function () { if (none) cancelHunt(c.id); else claim(false, c.id); } }; render(); return;
+      }
       startHunt(c.id);
     },
     claim: function () { claim(false); },
@@ -1174,7 +1207,7 @@
       (lk.stage < 5 ? '<div class="nextlook" title="다음 외형">' + charPic(j, { stage: nextStage, set: 0 }, 'idle', 'sil') + '<span>다음 외형</span></div>' : '') + '</div>' +
       '<div class="row"><b style="color:' + LOOK_COLOR[lk.stage] + '">' + LOOK_NAME[lk.stage] + ' 외형</b>' + (lk.set ? '<span class="setbadge">' + setLabel(lk) + '</span>' : '') + '<span class="small" style="flex:1;text-align:right">' + esc(goal) + '</span></div>' +
       '<div class="setbar">' + marks.map(function (m) { return '<i class="' + (lk.stage && lk.count >= m ? 'on' : '') + '" style="left:' + (m / max * 100) + '%"><b>' + m + '</b></i>'; }).join('') + '<u style="width:' + Math.min(100, (lk.stage ? lk.count : have) / max * 100) + '%"></u></div>' +
-      '<p class="small">같은 등급 4부위 = 외형 변경 · 6세트·8세트 = 효과 추가. 랭킹·레이드에서 다른 골퍼에게 이 모습이 보여요</p></div>';
+      '<p class="small">같은 등급 4부위 = 외형 변경 · 6세트 = 발밑 문양 · 8세트 = 오라 기둥(외형 연출). 랭킹·레이드에서 다른 골퍼에게 이 모습이 보여요</p></div>';
   }
   /** 장착 변화로 외형·세트가 오르면 진화 팝업(B-33) */
   function lookCheck(j, before) {
@@ -1191,12 +1224,22 @@
     var c = data.contents; S.wallet.gold += c.gold; addMats(c.materials); addMats(c.special);
     S.items = S.items.concat(data.items); S.chests = S.chests.filter(function (x) { return x.chest_id !== id; });
   }
+  /** 보상 없이 종료(+이동). v1.0.2 F1: 종료 요청을 먼저 줄 세운 뒤 새 사냥 시작(순서가 바뀌면 새 사냥이 서버에서 거절돼 사라짐) */
+  function cancelHunt(thenCourse) {
+    S.hunt = null; commit('huntClaim', { cancel: true });
+    if (thenCourse) startHunt(thenCourse); else go('map');
+  }
+  function huntTicksSafe(h) { return h && h.seed && !h.pending ? Engine.huntTicks(M, Date.parse(h.started_at), now(), h.tutorial) : null; }
+  function nextTickLabel(h) {
+    var per = (h.tick_minutes || M.huntConst.tickMinutes) * 60000, el = Math.max(0, now() - Date.parse(h.started_at)), left = per - (el % per);
+    return Math.floor(left / 60000) + ':' + ('0' + Math.floor(left % 60000 / 1000)).slice(-2);
+  }
   function claim(skip, thenCourse) {
     var h = S.hunt; if (!h) return;
     var noTicks = function () {
+      if (thenCourse) { cancelHunt(thenCourse); return; } // v1.0.2: 이동은 이미 확인함 → 두 번째 확인창 없이 이동
       popup = { type: 'confirm', title: '보상 없이 종료할까요?', text: h.tutorial ? '체험 보상은 시작 30초 뒤에 쌓여요.' : '아직 쌓인 보상이 없어요(5분마다 계산).', yes: '보상 없이 종료', no: '계속 사냥', run: function () {
-        S.hunt = null; if (thenCourse) startHunt(thenCourse); else go('map'); // 화면 먼저, 서버 종료는 뒤에서
-        commit('huntClaim', { cancel: true });
+        cancelHunt(null);
       } }; render();
     };
     // 같은 엔진·같은 시드로 보상을 미리 계산해 결과를 바로 보여 줌(v0.5 최적화). 시드를 아직 못 받았으면 서버 응답을 기다림
@@ -1261,6 +1304,7 @@
   });
   // 인트로: 컷 등장·진행 점·마지막 컷에서만 [모험 시작]
   root.addEventListener('scroll', function (e) {
+    if (e.target.matches && e.target.matches('[data-scroll="intro"]') && e.target.querySelector('.mcut')) { introScroll(e.target); return; }
     if (e.target.matches && e.target.matches('[data-scroll="intro"]')) {
       var cur = 0, top = e.target.getBoundingClientRect().top, hgt = e.target.clientHeight;
       e.target.querySelectorAll('.cut').forEach(function (c, i) {
@@ -1466,8 +1510,9 @@
     // B-36: 왼쪽 = GS 샷데이터(누가·무엇을), 오른쪽 = 레이드 적용(입힌 피해·판정·SP)
     return '<div class="card shotcard v6 q-' + s.quality + (mine ? ' mine' : '') + '" data-tut="shotcard"><div class="gsside">' +
       '<div class="gshead"><span class="gslabel">GS 샷데이터 수신</span><b class="who">' + esc(nickOf(s.slot)) + (mine ? ' (나)' : '') + '</b><span class="grd">' + esc(pp.grade_code || '') + '</span><span class="seq">' + s.seq + '번째 샷</span></div>' +
-      '<div class="row" style="justify-content:flex-start;gap:8px"><div class="clubic">' + img('icon_club_' + CLUB_FILE[s.club] + '.png') + '</div><b>' + esc(s.club_name) + (s.holeout ? ' · 홀아웃!' : '') + '</b></div>' +
-      '<div class="metrics">' + m.map(function (x) { return '<span><i>' + x[0] + '</i><b>' + x[1] + '</b></span>'; }).join('') + '</div></div>' +
+      // v1.0.2 A: 클럽은 왼쪽, 이번 샷 데이터는 가운데 크게(이 샷 데이터로 공격한다는 것을 보여 줌)
+      '<div class="shotbody"><div class="clubcol"><div class="clubic">' + img('icon_club_' + CLUB_FILE[s.club] + '.png') + '</div><b>' + esc(s.club_name) + '</b>' + (s.holeout ? '<em>홀아웃!</em>' : '') + '</div>' +
+      '<div class="metrics big">' + m.map(function (x) { return '<span><i>' + x[0] + '</i><b>' + x[1] + '</b></span>'; }).join('') + '</div></div></div>' +
       '<div class="raidside"><span class="lbl">입힌 피해</span><b class="dd">' + (s.d < 0.5 ? '막힘' : '-' + fmtR(s.d)) + '</b><b class="qn">' + QUALITY_NAME[s.quality] + '</b><span class="spg">SP +' + s.sp_gain + '</span></div></div>';
   }
   function spState() {
@@ -1525,15 +1570,15 @@
           '<div class="ex"><img class="exchest" src="' + asset('chest_4_closed.png') + '" alt="" onerror="this.remove()"><b>→</b>' + ['MAT-RIFT-3', 'MAT-RIFT-4', 'MAT-RIFT-5'].map(matIcon).join('') + '<b>→</b><span class="exbox">희귀 장비</span></div>']
       ];
       return dgScreen(
+        mine + '<div class="dgmore">' +
         '<div class="dghero"><img src="' + asset('boss_riftlord_idle.png') + '" alt="" onerror="this.remove()"><div><h2 class="title">스크린 라운드가 곧 던전 레이드</h2><p>스크린로그인 후 GS에서 플레이하면 던전 레이드가 함께 진행돼요.</p></div></div>' +
-        mine +
         '<div class="gsdata"><b class="small">GS 연동 데이터</b><div class="chips wrap">' + ['코스 난이도', '라운드 설정', '개인 설정', '샷데이터', '홀 스코어'].map(chip).join('') + '</div></div>' +
         '<div class="flow">' + steps.map(function (s, i) {
           return '<div class="fstep reveal"><i class="fno">' + '①②③④'[i] + '</i><div><b>' + s[0] + '</b><p class="sub">' + s[1] + '</p>' + s[2] + '</div></div>';
         }).join('') + '</div>' +
         '<div class="card entry"><b>입장 방법</b><p class="sub">레이드 입장은 골프존앱 메인 상단 [스크린로그인]에서</p>' +
         '<div class="miniapp"><div class="mock"><i class="m1"></i><i class="m2"></i><i class="m3"></i><i class="m4"></i></div>' +
-        '<img src="' + asset('mini_app_main.png') + '" alt="골프존앱 메인 화면" onerror="this.remove()"><i class="pulse"></i></div></div>');
+        '<img src="' + asset('mini_app_main.png') + '" alt="골프존앱 메인 화면" onerror="this.remove()"><i class="pulse"></i></div></div></div>');
     },
 
     /* DG-01 스크린로그인 */
@@ -1574,17 +1619,21 @@
     dgReady: function () {
       var r = D.round, zone = M.diffZones.filter(function (z) { return z.zone === r.zone; })[0], rs = r.room_settings || {};
       var reg = IX.region[r.course.region_id];
+      // v1.0.2 B: 코스·그린 난이도 별(골프존 스크린 표기, 0.5 = 반 별) · 라운드 설정 4개 같은 굵기 · 점수 내역 + 데이터 기반 결론
+      var sc = r.score || { course: null, room: null, personal: null, total: r.diff_score };
       var flow = [
-        ['GS 코스', esc(r.course.name), (reg ? esc(reg.name) + ' · ' : '') + '18홀 PAR ' + r.course.par.reduce(function (a, b) { return a + b; }, 0)],
-        ['라운드 설정', Object.keys(rs).slice(0, 2).map(function (k) { return esc(k + ' ' + rs[k]); }).join(' · '), Object.keys(rs).slice(2).map(function (k) { return esc(k + ' ' + rs[k]); }).join(' · ')],
-        ['난이도 점수', r.diff_score + '점', '구간 ' + r.zone + ' · ' + esc(zone.bossRank)],
+        ['GS 코스', esc(r.course.name) + (reg ? ' <span class="reg">' + esc(reg.name) + '</span>' : ''),
+          r.course.course_diff !== undefined ? '<span class="diffstars"><span class="ds">코스 ' + starsHtml(r.course.course_diff / 2) + '</span><span class="ds">그린 ' + starsHtml(r.course.green_diff / 2) + '</span></span>' : ''],
+        ['라운드 설정', '<span class="rsets">' + Object.keys(rs).map(function (k) { return '<span><i>' + esc(k) + '</i><em>' + esc(rs[k]) + '</em></span>'; }).join('') + '</span>', ''],
+        ['난이도 점수', '<span class="scoresum">' + (sc.course !== null ? '<span><i>GS 코스</i><em>' + fmtN(sc.course) + '점</em></span><span><i>+ 라운드 설정</i><em>' + fmtN(sc.room) + '점</em></span><span><i>+ 개인 설정</i><em>' + fmtN(sc.personal) + '점</em></span><span class="tot"><i>= 총점</i><em>' + fmtN(sc.total) + '점</em></span>' : '<span class="tot"><i>총점</i><em>' + fmtN(sc.total) + '점</em></span>') + '</span>',
+          '<b class="verdict">난이도 ' + esc(r.zone) + ' 확정 · ' + esc(zone.bossRank) + ' 등급 보스 출현!</b>'],
         ['지역 보스', esc(r.boss.name), reg ? esc(reg.name) + ' 지역' : ''],
         ['보스 HP', fmt(r.boss.hp_max), '최고 보상 ' + GRADE_NAME[zone.maxRewardGrade] + ' 상자']
       ];
       return dgScreen('<div class="row"><b style="font-size:20px">레이드 준비</b><span class="simbadge">시뮬레이션</span></div>' +
         '<div class="bossbox"><img src="' + bossImg(r.boss.id) + '" alt="" onerror="this.remove()"><div class="bossname">' + esc(r.boss.name) + '</div></div>' +
         '<p class="sub" style="text-align:center">"' + esc(r.boss.line) + '"</p>' +
-        '<ol class="gsflow">' + flow.map(function (f, i) { return '<li style="animation-delay:' + (i * 0.45) + 's"><span class="k">' + f[0] + '</span><b>' + f[1] + '</b><span class="small">' + f[2] + '</span></li>'; }).join('') + '</ol>' +
+        '<ol class="gsflow">' + flow.map(function (f, i) { return '<li style="animation-delay:' + (i * 0.45) + 's"><span class="k">' + f[0] + '</span>' + (i === 1 || i === 2 ? '<div class="fv">' + f[1] + '</div>' : '<b>' + f[1] + '</b>') + (f[2] ? '<span class="small">' + f[2] + '</span>' : '') + '</li>'; }).join('') + '</ol>' +
         '<div class="card"><b>참가 ' + r.participants.length + '명 · 구성 보너스 +' + Math.round(r.job_bonus * 100) + '%</b><div class="partyfaces">' + r.participants.map(function (p) { return '<div>' + charPic(p.job_id, { stage: Number(p.look_stage || 0), set: Number(p.set_tier || 0) }, 'idle', 'mini') + '<span>' + esc(p.nickname) + '</span></div>'; }).join('') + '</div>' +
         '<p class="small">보스 스킬: 1·4·7·10·13·16번 홀마다 무작위 발동 · 자동치기 샷당 ' + r.timing.shot_seconds + '초 · 홀 종료 ' + r.timing.hole_end_seconds + '초</p></div>' +
         '<div style="flex:1"></div><button class="btn purple" data-a="dgStart"' + (D.busy ? ' disabled' : '') + '>' + (D.busy ? '시작 중…' : '레이드 시작') + '</button><p class="small" style="text-align:center">시작 후에는 참가자·캐릭터를 바꿀 수 없어요</p>');
@@ -1613,7 +1662,6 @@
       if (x.aborted) return dgScreen('<div class="card"><b>라운드 중단</b><p class="sub">' + esc(x.message) + '</p></div><button class="btn" data-a="dgExit">던전 나가기</button>');
       var g = x.grade, ps = (x.players || []).slice(), tot = ps.reduce(function (a, p) { return a + p.damage; }, 0) || 1;
       var shotSum = ps.reduce(function (a, p) { return a + p.shot_damage; }, 0), holeSum = ps.reduce(function (a, p) { return a + p.hole_damage; }, 0);
-      var sp = (IX.rewardGrade[g] && IX.rewardGrade[g].special) || [];
       var body = '<b style="font-size:20px">라운드 결과</b>' +
         '<div class="card"><div class="row"><b style="color:' + (x.killed_at ? 'var(--ok)' : 'var(--bad)') + '">' + (x.killed_at ? '보스 처치 · ' + x.killed_at + 'H' : '보스 생존') + '</b><span>' + esc(r ? r.boss.name : '') + '</span></div>' +
         '<p class="sub">파티 피해 ' + fmt(x.total_damage) + ' · 데미지 비율 ' + Math.round(x.ratio * 100) + '%</p>' +
@@ -1626,7 +1674,7 @@
         }).join('') + '</div>' +
         '<div class="card g' + g + '" style="border:2px solid var(--gc)"><div class="row" style="justify-content:flex-start"><img class="chesticon" src="' + asset('chest_' + g + '_closed.png') + '" alt="" onerror="this.remove()"><div><b class="gname" style="font-size:18px">' + esc(x.grade_name) + ' 상자 1개</b>' +
         '<p class="sub">' + (x.capped ? '데미지 비율로는 ' + esc(x.grade_by_ratio) + '이지만 난이도 ' + x.zone + ' 구간 최고 등급이 적용됐어요' : '데미지 비율 ' + Math.round(x.ratio * 100) + '%로 결정') + '</p></div></div>' +
-        '<p class="small">특수 재료 미리보기</p><div class="row" style="justify-content:flex-start;gap:8px">' + (sp.length ? sp.map(function (s) { return matIcon(s.materialId) + '<span class="small">' + esc(matName(s.materialId)) + ' ' + s.min + '~' + s.max + '</span>'; }).join('') : '<span class="small">이 등급 상자에는 특수 재료가 없어요</span>') + '</div></div>' +
+        chestPreview(g, x.contents, r && r.participants[0] && r.participants[0].job_id) + '</div>' +
         '<button class="btn purple" data-a="dgOpenChests">받은 상자 열기</button>' +
         (D.bonusDone ? '<button class="btn ghost" disabled>1+1 추가 상자 지급 완료</button>' : '<button class="btn ghost" data-a="dgBuy">1+1 추가 상자 (시연용 결제)</button>') +
         '<button class="small" data-a="probs" style="padding:8px">확률 보기</button>';
@@ -1876,7 +1924,7 @@
     var r = D.round;
     if (r.status === 'READY') { go('dgReady'); return; }
     D.spLocal = null;
-    if (D.coach === null && !(S.tutorial && S.tutorial.raid_coach_seen)) D.coach = 0;
+    if (D.coach === null && !(S.tutorial && (S.tutorial.raid_coach_seen || S.tutorial.tutorial_raid_at))) D.coach = 0; // v1.0.2 U5: 던전 체험에서 배운 사람은 생략
     go('dgRaid'); dgSchedule();
   }
   // 레이드 화면 숨김 영역 3연속 터치 = 남은 홀 즉시 완료
@@ -1933,12 +1981,13 @@
       '<div class="row"><b style="font-size:20px">' + esc(jb.name) + '</b><span class="badge">' + esc(jb.role) + ' · ' + (AT[jb.attackType] || '') + '</span></div>' +
       '<p class="sub">' + esc(jb.concept) + ' · 무기 ' + esc(jb.weapon) + '</p>' +
       '<b class="small">외형 성장</b><div class="looksteps">' + [0, 1, 2, 3, 4, 5].map(function (s) { return '<div>' + charPic(j, { stage: s, set: 0 }, 'idle', 'mini') + '<span style="color:' + LOOK_COLOR[s] + '">' + LOOK_NAME[s] + '</span></div>'; }).join('') + '</div>' +
-      '<p class="small">같은 등급 장비 4부위를 갖추면 외형이 바뀌어요</p>' +
+      '<p class="small">같은 등급 장비 4부위를 갖추면 외형이 바뀌어요 · 주재료 ' + FAM_NAME[fam] + ' · 첫 사냥터 ' + esc(reg.name) + '</p>' +
+      '<div class="jobmore">' +
       '<b class="small">주재료 · 첫 사냥터</b><div class="row" style="justify-content:flex-start;gap:10px">' + matIcon('MAT-' + fam + '-1') +
       '<div><b>' + FAM_NAME[fam] + ' 계열</b><p class="small">' + esc(reg.name) + ' 사냥터에서 많이 나와요 · 지역마다 나오는 재료가 달라요</p></div></div>' +
       '<b class="small">장비</b><div class="row" style="justify-content:flex-start;gap:8px">' + parts + '<span class="small">외 4부위</span></div>' +
       '<b class="small">스킬 (전투력이 오르면 해금)</b><div class="skillmini">' + skills.map(function (s) { return '<div><i>' + s.stage + '</i><b>' + esc(s.name) + '</b><span>×' + s.coef + (s.unlockCp > 100 ? ' · ' + fmt(s.unlockCp) : '') + '</span></div>'; }).join('') + '</div>' +
-      '<p class="small rolefx">역할 · ' + esc(jb.roleEffect) + '</p></div>' +
+      '<p class="small rolefx">역할 · ' + esc(jb.roleEffect) + '</p></div></div>' +
       '</div><div class="dgfoot"><button class="btn purple" data-a="jobChoose" data-v="' + j + '"' + (p.busy ? ' disabled' : '') + '>' + (p.busy ? '준비 중…' : esc(euro(jb.name)) + ' 시작') + '</button>' +
       '<p class="small" style="text-align:center">시작 재료는 한 번만 받아요 · 대표 캐릭터는 캐릭터 탭에서 바꿀 수 있어요</p></div></div>';
   };
@@ -2005,7 +2054,7 @@
       if (pp === 'craftDetail') return { sel: '[data-tut=doCraft]', text: ['[제작]을 눌러요', partName(part) + ' · 4부위 중 ' + have + '부위 완료'] };
       if (spare && v === 'char') return { sel: '[data-tut=slot-' + part + ']', text: [partName(part) + ' 칸을 눌러 장착해요'] };
       if (v === 'craft') return { sel: '[data-tut=craftNext]', text: [josa(partName(part), '을', '를') + ' 만들어요', '무기 포함 4부위 = 외형 진화 · 지금 ' + have + '/4'], face: APP_CONFIG.V10_IMAGES ? 'pino_craft' : 'pino' };
-      return TAB('craft', '제작 탭에서 ' + josa(partName(part), '을', '를') + ' 만들어요');
+      return { sel: '[data-a=tab][data-v=craft]', text: ['다음은 ' + josa(partName(part), '을', '를') + ' 만들어요', '첫 외형까지 ' + have + '/4'], go: ['tutCraftGo', '다음 장비 만들기'] };
     }
     return null;
   };
@@ -2068,11 +2117,14 @@
     var up = upgradeCount(), eq = equipUpCount();
     if (eq) rows.push(['더 좋은 장비 장착', eq + '개 장착 가능', 'todoEquip', 'hot']);
     if (up) rows.push(['장비 업그레이드', job(mainJob()).name + ' ' + up + '부위 지금 제작 가능', 'todoCraft', 'hot']);
+    if (dgActive()) rows.push(['레이드 이어 보기', '진행 중인 레이드로 돌아가요', 'dgResumeRing', 'hot']);
     if (S.chests.length) rows.push(['상자 열기', S.chests.length + '개 남음', 'todoChest', 'hot']);
-    else rows.push(['던전 레이드', '스크린 라운드로 특수 재료 받기', 'todoRaid', '']);
+    else if (!dgActive()) rows.push(['던전 레이드', '스크린 라운드로 특수 재료 받기', 'todoRaid', '']);
     if (missionReady()) rows.push(['미션 보상', missionReady() + '개 받기', 'missions', 'hot']);
-    return '<div class="card today">' + (APP_CONFIG.V10_IMAGES ? '<img class="todaypino" src="' + asset('pino_point.png') + '" alt="">' : '') + '<div class="row"><b>오늘 할 일</b><span class="small">' + rows.filter(function (r) { return r[3]; }).length + '개 준비됨</span></div>' +
-      rows.slice(0, 4).map(function (r) { return '<button class="todo' + (r[3] ? ' hot' : '') + '" data-a="' + r[2] + '"><b>' + r[0] + '</b><span>' + esc(r[1]) + '</span><i>›</i></button>'; }).join('') + '</div>';
+    // v1.0.2 U3: 지금 할 일 하나만 강조(나머지는 평범한 링크), 요약 숫자 없음
+    rows.sort(function (a, b) { return (b[3] ? 1 : 0) - (a[3] ? 1 : 0); });
+    return '<div class="card today">' + (APP_CONFIG.V10_IMAGES ? '<img class="todaypino" src="' + asset('pino_point.png') + '" alt="">' : '') + '<div class="row"><b>오늘 할 일</b></div>' +
+      rows.slice(0, 4).map(function (r, i) { return '<button class="todo' + (i === 0 && r[3] ? ' hot' : '') + '" data-a="' + r[2] + '"><b>' + r[0] + '</b><span>' + esc(r[1]) + '</span><i>›</i></button>'; }).join('') + '</div>';
   }
   A.todoHunt = function () { go(S.hunt ? 'hunt' : 'courses', S.hunt ? {} : { region: 'REC' }); };
   A.todoEquip = function () { go('items', { tab: 'equip' }); };
@@ -2105,7 +2157,11 @@
     if (h && !h.tutorial) html = html.replace('<div class="dgfoot" style="background:var(--bg)">', '<div class="dgfoot" style="background:var(--bg)">' + (huntFull(h) ? '<p class="fullnote">가방이 가득 찼어요 · 더 쌓이지 않아요</p>' : '') + '<button class="btn ghost" data-a="claimContinue">받고 계속 사냥</button>');
     return html;
   };
-  A.claimContinue = function () { var h = S.hunt; if (!h) return; claim(false, h.course_id); };
+  A.claimContinue = function () {
+    var h = S.hunt; if (!h) return;
+    if (huntTicksSafe(h) === 0) { toast('아직 받을 보상이 없어요 · 다음 보상까지 ' + nextTickLabel(h) + ' · 사냥은 계속돼요'); return; } // U1: 계속 = 유지
+    claim(false, h.course_id);
+  };
   function huntFullBanner() {
     var h = S && S.hunt; if (!h || h.tutorial || !huntFull(h)) return '';
     fev('fn_full_banner');
@@ -2131,7 +2187,7 @@
     var trial = S.tutorial && !S.tutorial.tutorial_raid_at ? '<div class="card tutraid"><div class="row" style="justify-content:flex-start;gap:12px"><img class="tbimg" src="' + v10a('boss_tutorial_idle.png', 'boss_metro_idle.png') + '" alt=""><div style="flex:1"><b>던전 체험 · 연습장 골렘</b><p class="small">3홀 · 약 2분 · 계정당 1회 · ' + esc(job(mainJob()).name) + ' 3부위 재료 상자</p></div></div>' +
       '<button class="btn purple" data-a="tutRaidOpen" data-tut="tutRaid">던전 체험 시작</button></div>' : '';
     var start = '<div class="dgstart' + (APP_CONFIG.V10_IMAGES ? ' img' : '') + '"' + (APP_CONFIG.V10_IMAGES ? '' : ' style="background-image:linear-gradient(90deg,#0B0716EE 30%,#0B071660),url(' + asset('webtoon_07.jpg') + ')"') + '>' + (APP_CONFIG.V10_IMAGES ? '<img class="dgsimg" src="' + asset('dg_start_banner.png') + '" alt="">' : '') + '<b>스크린 라운드가 곧 레이드</b><p>매장에서 스크린로그인하고 18홀을 치면 보스를 공격해요</p><button class="btn gold" data-a="dgStartGo">스크린 라운드로 시작</button><span class="simbadge">체험 레이드</span></div>';
-    return html.replace('<div class="dghero">', trial + start + '<div class="dghero">');
+    return html.replace('<div class="scroll">', '<div class="scroll">' + trial + start);
   };
 
   // 레이드 입장은 골프존앱 상단 [스크린 로그인] 하나(C-11) → 그 버튼으로 데려가 강조
@@ -2206,7 +2262,7 @@
     } else {
       var p = TB.party[ev[0]];
       TB.hp -= ev[3]; TB.last = { who: p.nickname + (ev[0] === 0 ? ' (나)' : ''), what: { DRIVER: '드라이버', IRON: '아이언', PUTTER: '퍼터' }[ev[1]] + ' · ' + QUALITY_NAME[ev[2]], dmg: ev[3] };
-      if (ev[0] === 0) { TB.sp = Math.min(100, TB.sp + (TB.hole === 2 ? 50 : 35)); if (TB.sp >= 100 && !TB.spReady) { TB.spReady = true; TB.tip = 2; TB.paused = true; } }
+      if (ev[0] === 0) { TB.sp = Math.min(100, TB.sp + (TB.hole === 2 ? 50 : 35)); if (TB.sp >= 100 && !TB.spReady) { TB.spReady = true; if (!TB.spTaught) { TB.spTaught = true; TB.tip = 2; TB.paused = true; } } } // U5: 특수공격 안내는 처음 한 번만
       TB.ev++; render(); tbAnimate(ev, false);
     }
     schedTb();
@@ -2243,6 +2299,26 @@
   };
   A.tutCraftGo = function () { popup = null; go('craft', { job: mainJob(), part: tutMissingPart() || '' }); };
 
+  /* ---- 튜토리얼 진행 표시(U5): 6단계 안을 던전 체험 → 첫 외형 1/3·2/3·3/3으로 ---- */
+  function tutLabel() {
+    var st = tutCur();
+    if (!v10() || TUT.replay || st !== 6) return st + '/6';
+    if (tutPhase6() === 'raid') return '6/6 · 던전 체험';
+    var done = bal10().tutorialParts.filter(function (x) { return !!equippedAt(mainJob(), x); }).length;
+    return '6/6 · 첫 외형 ' + done + '/3';
+  }
+  /* ---- 외형 진화 팝업은 처음 달성 때만(U5), 다시 맞춘 세트는 토스트 ---- */
+  function lookBestKey() { return 'rf_lookbest_' + (S && S.member ? S.member.member_id : ''); }
+  function lookBest() { try { return JSON.parse(localStorage.getItem(lookBestKey()) || '{}'); } catch (e) { return {}; } }
+  function lookScore(lk) { return lk.stage * 10 + (lk.set || 0); }
+  var _lookCheck0 = lookCheck;
+  lookCheck = function (j, before) {
+    _lookCheck0(j, before);
+    if (!popup || popup.type !== 'evolve') return;
+    var best = lookBest(), b = best[j] || 0, sc = lookScore(popup.to);
+    if (sc <= b) { var p = popup; popup = null; toast(job(j).name + ' ' + LOOK_NAME[p.to.stage] + ' 외형' + (p.to.set ? ' · ' + setLabel(p.to) : '') + ' 다시 갖췄어요'); return; }
+    best[j] = sc; try { localStorage.setItem(lookBestKey(), JSON.stringify(best)); } catch (e) {}
+  };
   /* ---- 외형 진화 퍼널 ---- */
   var _lookCheck = lookCheck;
   lookCheck = function (j, before) { _lookCheck(j, before); if (popup && popup.type === 'evolve' && popup.to.stage > popup.from.stage) fev('fn_look_up', { job_id: j, stage: popup.to.stage }); };
@@ -2296,14 +2372,14 @@
     var st = spState();
     if (st.state !== 'READY') { D.spReadyAt = 0; return; }
     if (!D.spReadyAt) { D.spReadyAt = Date.now(); return; }
-    if (Date.now() - D.spReadyAt > 4000) { D.spReadyAt = 0; var b = root.querySelector('[data-a=dgSp]'); if (b && !b.disabled) { toast('SP 자동 사용'); A.dgSp(b.dataset, b); } }
+    if (Date.now() - D.spReadyAt > 4000) { D.spReadyAt = 0; var b = root.querySelector('[data-a=dgSp]'); if (b && !b.disabled) { toast('특수공격 자동 사용!'); A.dgSp(b.dataset, b); } }
   }, 500);
   var _spButton = spButton;
   spButton = function () {
     var html = _spButton(); if (!html) return html;
-    return html.replace('<button ', '<button class="autosp' + (D.autoSp ? ' on' : '') + '" data-a="autoSp">SP 자동 사용 ' + (D.autoSp ? 'ON' : 'OFF') + '</button><button ');
+    return html.replace('<button ', '<button class="autosp' + (D.autoSp ? ' on' : '') + '" data-a="autoSp">특수공격 자동 ' + (D.autoSp ? 'ON' : 'OFF') + '</button><button ');
   };
-  A.autoSp = function () { D.autoSp = !D.autoSp; toast('SP 자동 사용 ' + (D.autoSp ? '켬 · 준비되면 4초 뒤 자동으로 써요' : '끔')); render(); };
+  A.autoSp = function () { D.autoSp = !D.autoSp; toast('특수공격 자동 ' + (D.autoSp ? '켬 · 준비되면 4초 뒤 자동으로 써요' : '끔 · 준비되면 직접 눌러요')); render(); };
 
   /* ---- 미션(B-58): 이름·한 번에 받기·KST ---- */
   var _missions = POPUPS.missions;
@@ -2317,8 +2393,101 @@
     var list = (popup && popup.data && popup.data.missions || []).filter(function (m) { return m.done && !m.claimed && m.event_type !== 'ALL_CLEAR'; });
     var all = (popup && popup.data && popup.data.missions || []).filter(function (m) { return m.done && !m.claimed && m.event_type === 'ALL_CLEAR'; });
     if (el) el.disabled = true;
+    var gold = 0, mats = {};
+    list.concat(all).forEach(function (m) { var r = m.reward || {}; gold += r.gold || 0; Object.keys(r.materials || {}).forEach(function (k) { mats[k] = (mats[k] || 0) + r.materials[k]; }); });
     list.concat(all).forEach(function (m) { A.missionClaim({ v: m.mission_id }, { disabled: false }); });
+    toast(list.concat(all).length + '개 수령 · 총 ' + [gold ? fmt(gold) + 'G' : '', Object.keys(mats).map(function (k) { return matName(k) + ' ' + mats[k]; }).join(' ')].filter(Boolean).join(' + ')); // U6: 합계
   };
+
+  // ================= v1.0.2 새 인트로: 9컷 모션 웹툰(데이터 정의) =================
+  // 컷마다 배경·레이어(위치 %·등장 시점)·대사(화자·등장 시점)·효과를 데이터로 정의 → 시나리오·타이밍은 이 표만 고치면 됨
+  // 컷 기준점이 화면 55% 선을 지나면 재생(.play), 재생 없이 지나간 컷은 완료 상태(.done), 위로 돌아가도 강한 효과는 반복 안 함
+  var INTRO = [
+    { bg: 'webtoon_02.jpg', cam: 'zoomBall', pos: 'bottom',
+      layers: [{ cls: 'ballglow', x: 52, y: 80, w: 16, at: 1500 }],
+      lines: [{ who: 'nar', t: '{nick}님, 오늘도 마지막 퍼트를 앞두고 있습니다.', at: 400 }, { who: 'me', t: '이 퍼트만 넣으면…', at: 1000 }] },
+    { bg: 'webtoon_01.jpg', cam: 'zoomRift', fx: ['flash', 'shake', 'particles'], pos: 'top',
+      lines: [{ who: 'sfx', t: '쩌저적—!', at: 100 }, { who: 'me', t: '잠깐… 스크린이 열렸어?', at: 700 }] },
+    { bg: 'intro_03_bg.webp', pos: 'top',
+      layers: [{ img: 'pino_cheer.png', x: 62, y: 40, w: 28, at: 700, cls: 'pop float' }, { cls: 'sparkle', x: 64, y: 38, w: 24, at: 750 }],
+      lines: [{ who: 'me', t: '여긴… 어느 골프장이야?', at: 400 }, { who: 'pino', t: '어서 와! 나는 캐디 요정 피노야.', at: 1000 }, { who: 'pino', t: '여긴 네가 알던 코스 너머의 세계야.', at: 1500 }] },
+    { bg: 'intro_04_bg.webp', fx: ['riftglow'], pos: 'bottom',
+      layers: [{ img: 'boss_riftlord_idle.png', x: 14, y: 4, w: 72, at: 300, cls: 'reveal' }],
+      lines: [{ who: 'pino', t: '하지만 지금은 몬스터가 코스를 점령했어!', at: 800 }, { who: 'me', t: '저걸… 골프채로 상대하라고?', at: 1400 }] },
+    { bg: 'intro_05_bg.webp', pos: 'top',
+      layers: [{ job: 'WAR', x: 4, y: 53, w: 24, at: 300, cls: 'summon c-war' }, { job: 'MAG', x: 26, y: 53, w: 24, at: 550, cls: 'summon c-mag' },
+        { job: 'ARC', x: 50, y: 53, w: 24, at: 800, cls: 'summon c-arc' }, { job: 'ROG', x: 75, y: 53, w: 24, at: 1050, cls: 'summon c-rog' }],
+      lines: [{ who: 'pino', t: '혼자 싸우라는 게 아니야.', at: 200 }, { who: 'pino', t: '이 세계엔, 네 안의 네 가지 가능성이 있어.', at: 700 }, { who: 'me', t: '저 넷이… 전부 나라고?', at: 1300 }] },
+    { bg: 'intro_06_bg.webp', pos: 'top',
+      layers: [{ job: 'WAR', atk: true, x: 6, y: 40, w: 32, at: 0, cls: 'pop' }, { cls: 'hitfx', x: 26, y: 42, w: 16, at: 250 },
+        { img: 'icon_mat_iron_1.png', x: 26, y: 46, w: 10, at: 500, cls: 'fly', tx: 190, ty: 300 }, { img: 'icon_mat_leather_1.png', x: 30, y: 42, w: 10, at: 600, cls: 'fly', tx: 150, ty: 330 },
+        { img: 'icon_mat_cloth_1.png', x: 22, y: 44, w: 10, at: 700, cls: 'fly', tx: 230, ty: 310 },
+        { cls: 'goldflash', x: 33, y: 56, w: 34, at: 1000 }, { img: 'icon_item_war_g2_weapon.png', x: 40, y: 59, w: 20, at: 1050, cls: 'pop glowitem' }],
+      lines: [{ who: 'pino', t: '라운드가 없는 날엔 코스를 탐험하고,', at: 300 }, { who: 'pino', t: '모은 재료로 장비를 만들어 더 강해지는 거야.', at: 1000 }, { who: 'nar', t: '앱을 꺼도, 사냥은 계속된다.', at: 1500 }] },
+    { bg: 'intro_07_bg.webp', fx: ['trail', 'flash2'], pos: 'mid', key: true,
+      layers: [{ img: 'boss_riftlord_idle.png', x: 48, y: 0, w: 52, at: 0, cls: 'fadein bossr' }, { job: 'ARC', atk: true, stage: 3, x: 50, y: 30, w: 30, at: 300, cls: 'pop' },
+        { cls: 'hitfx big', x: 64, y: 10, w: 26, at: 900 },
+        { html: '<div class="minishotcard"><span class="gs">GS 샷데이터 수신</span><b>드라이버 · 비거리 232m · 방향각 +2°</b><em>크리티컬 · -1,280</em></div>', x: 4, y: 44, w: 62, at: 1000, cls: 'slide' }],
+      lines: [{ who: 'pino', t: '그리고 다시 스크린 앞에 서면…', at: 100 }, { who: 'hl', t: '네 샷이, 이 세계의 공격이 돼!', at: 1100 }, { who: 'me', t: '내 샷으로 보스를 공격한다고?', at: 1700 }] },
+    { bg: 'intro_08_bg.webp', fx: ['rune', 'volley', 'shake2', 'clear'], pos: 'top', key: true,
+      layers: [{ img: 'boss_hydra_idle.png', x: 46, y: 30, w: 56, at: 0, cls: 'fadein bossh' },
+        { party: 0, job: 'WAR', x: 0, y: 50, w: 22, at: 0, cls: 'fadein' }, { party: 1, job: 'MAG', x: 13, y: 60, w: 22, at: 100, cls: 'fadein' },
+        { party: 2, job: 'ARC', x: 26, y: 50, w: 22, at: 200, cls: 'fadein' }, { party: 3, job: 'ROG', x: 30, y: 66, w: 22, at: 300, cls: 'fadein' },
+        { cls: 'hitfx big', x: 58, y: 38, w: 30, at: 1200 }],
+      lines: [{ who: 'pino', t: '함께 라운드하는 동료들과 힘을 모아!', at: 200 }, { who: 'me', t: '좋아, 이번 홀은 같이 끝내자!', at: 800 }, { who: 'hl', t: '홀 완료 · 합동 공격!', at: 1200 }] },
+    { bg: 'webtoon_09.jpg', cam: 'depth', pos: 'top', last: true,
+      lines: [{ who: 'pino', t: '아직 되찾아야 할 코스가 많아.', at: 500 }, { who: 'pino', t: '네 명의 너와 함께, 다음 코스로 가자!', at: 1000 }] }
+  ];
+  function introPath(p) { return /\.(jpg|webp)$/.test(p) && p.indexOf('.webp') > 0 ? APP_CONFIG.ASSET_DIR + p + (APP_CONFIG.ASSET_VER ? '?v=' + APP_CONFIG.ASSET_VER : '') : asset(p); }
+  function introLayer(L, ci) {
+    var st = 'left:' + L.x + '%;top:' + L.y + '%;width:' + L.w + '%;--d:' + (L.at || 0) + 'ms' + (L.tx ? ';--tx:' + L.tx + '%;--ty:' + L.ty + '%' : '');
+    var inner = L.img ? '<img src="' + introPath(L.img) + '" alt="">' : L.job ? '<img src="' + charStage(L.job, L.stage !== undefined ? L.stage : 1, L.atk) + '" alt="" onerror="this.onerror=null;this.src=\'' + charFallback(L.job, L.atk) + '\'">' : (L.html || '');
+    if (L.party !== undefined) { var g = (M.guests || [])[L.party]; inner += '<span class="ipname">' + esc(L.party === 0 ? S.member.nickname : g ? g.nickname : '동료') + '</span>'; }
+    return '<div class="ily ' + (L.cls || '') + '" style="' + st + '">' + inner + '</div>';
+  }
+  var WHO = { me: '', pino: '피노', nar: '', sfx: '', hl: '' };
+  SCREENS.intro = function () {
+    var nick = esc(S.member.nickname);
+    var cuts = INTRO.map(function (c, i) {
+      var lines = c.lines.map(function (l) {
+        return '<p class="iln w-' + l.who + '" style="--d:' + l.at + 'ms">' + (l.who === 'pino' ? '<img class="lface" src="' + asset('pino.png') + '" alt="">' : '') + (WHO[l.who] ? '<b>' + WHO[l.who] + '</b>' : '') + '<span>' + esc(l.t).replace('{nick}', nick) + '</span></p>';
+      }).join('');
+      var fx = (c.fx || []).map(function (f) { return '<i class="ifx fx-' + f + '"></i>'; }).join('');
+      if ((c.fx || []).indexOf('particles') >= 0) for (var k = 0; k < 10; k++) fx += '<i class="ipt" style="left:' + (20 + (k * 37) % 60) + '%;--k:' + k + '"></i>';
+      if ((c.fx || []).indexOf('trail') >= 0) fx += '<svg class="itrail" viewBox="0 0 100 150" preserveAspectRatio="none"><defs><linearGradient id="trg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#C9A6FF"/><stop offset="1" stop-color="#FFD66B"/></linearGradient></defs><path d="M28 84 Q 40 40 72 20" /></svg>';
+      if ((c.fx || []).indexOf('volley') >= 0) fx += '<svg class="ivolley" viewBox="0 0 100 150" preserveAspectRatio="none">' + [[12, 95], [24, 108], [37, 95], [41, 118]].map(function (p, k) { return '<path style="--k:' + k + '" d="M' + p[0] + ' ' + p[1] + ' Q ' + (p[0] + 25) + ' ' + (p[1] - 45) + ' 74 78" />'; }).join('') + '</svg>';
+      return '<section class="mcut cam-' + (c.cam || 'none') + (c.key ? ' key' : '') + '" data-ci="' + i + '">' +
+        '<div class="ibg"><img src="' + introPath(c.bg) + '" alt=""' + (i > 1 ? ' loading="lazy"' : '') + '></div>' + fx +
+        (c.layers || []).map(function (L) { return introLayer(L, i); }).join('') +
+        '<div class="ilines p-' + c.pos + '">' + lines + '</div>' +
+        (c.last ? '<div class="iend"><h1 class="title">균열의 페어웨이</h1><button class="btn purple" data-a="introDone">나의 모험 시작</button></div>' : '') +
+        '</section>';
+    }).join('');
+    setTimeout(function () { introScroll(root.querySelector('[data-scroll="intro"]')); }, 60); // 첫 컷은 스크롤 없이 바로 재생
+    return '<div class="screen intro v102" style="position:relative"><button class="skip" data-a="introSkip">건너뛰기 ›</button>' +
+      '<div class="webtoon" data-scroll="intro">' + cuts + '<div style="height:40px"></div></div>' +
+      '<div class="cutdots">' + INTRO.map(function (c, i) { return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('') + '</div>' +
+      '<div class="swipehint"><span>아래로 넘겨 보세요</span><b>⌄</b></div></div>';
+  };
+  function introScroll(box) {
+    if (!box) return;
+    var top = box.getBoundingClientRect().top, hgt = box.clientHeight, cur = -1;
+    box.querySelectorAll('.mcut').forEach(function (c, i) {
+      var b = c.getBoundingClientRect(), rel = b.top - top;
+      if (rel < hgt * 0.55) {
+        if (!c.classList.contains('play') && !c.classList.contains('done')) {
+          if (b.bottom - top < hgt * 0.15) c.classList.add('done'); // 빠르게 지나간 컷: 연출 없이 읽을 수 있는 상태
+          else c.classList.add('play');
+        }
+        cur = i;
+      }
+    });
+    if (cur < 0) cur = 0;
+    box.querySelectorAll('.mcut').forEach(function (c, i) { c.classList.toggle('cur', i === cur); });
+    root.querySelectorAll('.cutdots i').forEach(function (d, i) { d.className = i === cur ? 'on' : ''; });
+    var hint = root.querySelector('.intro .swipehint'); if (hint) hint.style.display = cur >= INTRO.length - 1 ? 'none' : '';
+    view.p.cut = cur;
+  }
 
   // ---------------- 타이머 ----------------
   // 0.25초: 레이드 이벤트 재생 / 1초: 남은 시간·카운터·링 갱신 / 1.6초: 사냥 공격 루프(화면이 보일 때만)

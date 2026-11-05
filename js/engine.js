@@ -640,6 +640,14 @@ var Engine = (function () {
   }
   /** 상자 내용 확정(R-31 → v1.0): 상자 등급 × 참가 직업의 '다음 제작 등급'에 맞춘 재료·골드·특수 재료, 완제품은 희소
    *  target: 다음 제작 등급(1~5, 없으면 2). 같은 시드 → 같은 결과 */
+  /** 상자 등급 × 목표 등급 → 특수 재료 {id, min, max, prob} | null (미리보기·확률 안내와 실제 지급이 같은 표를 씀, v1.0.2) */
+  function chestSpecialRow(M, gradeNo, target) {
+    var B = bal(M), tg = Math.max(1, Math.min(5, target || 2)), sp = B.chestSpecial[tg];
+    if (!sp && tg <= 2 && gradeNo >= 3) sp = { id: 'MAT-RIFT-3', rows: [[0, 0, 0], [0, 0, 0], [1, 1, 0.5], [1, 1, 0.7], [1, 1, 1]] }; // 희귀 준비
+    if (!sp) return null;
+    var row = sp.rows[gradeNo - 1]; if (!row || !row[2] || !row[1]) return null;
+    return { id: sp.id, min: row[0], max: row[1], prob: row[2] };
+  }
   function chestContents(M, gradeNo, zoneId, partySize, regionId, jobId, seed, target) {
     var B = bal(M), ix = index(M), r = rng('chest10:' + seed), tg = Math.max(1, Math.min(5, target || 2));
     var zone = M.diffZones.filter(function (z) { return z.zone === zoneId; })[0] || { rewardBonus: 0 };
@@ -657,9 +665,8 @@ var Engine = (function () {
     var avgGold = itemsTg.reduce(function (a, it) { return a + ix.recipe[it.id].gold; }, 0) / (itemsTg.length || 1);
     var gold = Math.round(avgGold * B.chestGoldRate[gradeNo] / 10) * 10;
     var items = r() < B.chestEquipProb[gradeNo] ? [randomItem(M, r, jobId, tg).id] : [];
-    var special = {}, sp = B.chestSpecial[tg];
-    if (!sp && tg <= 2 && gradeNo >= 3) sp = { id: 'MAT-RIFT-3', rows: [[0, 0, 0], [0, 0, 0], [1, 1, 0.5], [1, 1, 0.7], [1, 1, 1]] }; // 희귀 준비
-    if (sp) { var row = sp.rows[gradeNo - 1]; if (r() < row[2]) { var q = randInt(r, row[0], row[1]); if (q > 0) special[sp.id] = q; } }
+    var special = {}, row = chestSpecialRow(M, gradeNo, tg);
+    if (row) { if (r() < row.prob) { var q = randInt(r, row.min, row.max); if (q > 0) special[row.id] = q; } }
     return { grade: gradeNo, gold: gold, materials: mats, special: special, items: items, target_grade: tg, v: 10 };
   }
 
@@ -671,7 +678,7 @@ var Engine = (function () {
     setupRound: setupRound, simulateRound: simulateRound, indexAt: indexAt, eventEndMs: eventEndMs, skillAtHole: skillAtHole,
     buildPlan: buildPlan, judgeShot: judgeShot, clubSequence: clubSequence, shotExp: shotExp, accountCp: accountCp,
     holeResult: holeResult, rewardGradeByRatio: rewardGradeByRatio, finalRewardGrade: finalRewardGrade,
-    chestContents: chestContents, tutorialChest: tutorialChest, targetGrade: targetGrade, bal: bal, zoneOf: zoneOf, settingsScore: settingsScore, lookOf: lookOf, lookByCp: lookByCp
+    chestContents: chestContents, chestSpecialRow: chestSpecialRow, tutorialChest: tutorialChest, targetGrade: targetGrade, bal: bal, zoneOf: zoneOf, settingsScore: settingsScore, lookOf: lookOf, lookByCp: lookByCp
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
