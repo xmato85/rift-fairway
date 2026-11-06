@@ -994,3 +994,26 @@ details.jobmore > *:not(summary), details.dgmore > *:not(summary) { margin-top: 
 .scoresum .tot em { font-size: 17px; font-weight: 700; }
 .verdict { display: block !important; margin-top: 6px; font-size: 16px; line-height: 1.4; }
 .jobmore, .dgmore { display: flex; flex-direction: column; gap: 8px; }
+
+/* ===== v1.0.3 ===== */
+/* C14 한국어 줄바꿈: 단어 중간에서 끊지 않음 */
+body, .scroll, .sheet, .cbubble, .iln, .card, button { word-break: keep-all; overflow-wrap: break-word; }
+.verdict span { display: block; }
+.raidtop { flex-wrap: nowrap; } .raidtop #dgNext { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.raidtop .nl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; } .raidtop .nt { white-space: nowrap; color: var(--gold); }
+.partyfaces span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 64px; display: block; }
+/* C15 스킬 한 줄 목록 */
+.skillmini { grid-template-columns: 1fr !important; gap: 4px !important; }
+.skillmini > div { padding: 7px 10px !important; } .skillmini b { white-space: nowrap; } .skillmini span { white-space: nowrap; }
+/* C16 말풍선 버튼 줄 */
+.cbubble .row { flex-wrap: wrap; row-gap: 6px; } .cbubble .row .small { white-space: nowrap; }
+/* C19·C20 사냥 캐릭터·효율 */
+.huntwho { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; color: var(--sub); }
+.huntwho b { color: var(--text); } .huntwho i { font-style: normal; font-size: 12px; color: var(--mute); }
+.huntwho .eff { flex: none; font-size: 13px; padding: 2px 8px; border-radius: 8px; background: #2E8B5733; color: var(--ok); }
+.huntwho .eff.low { background: #E0604F33; color: #FFB4A6; }
+/* C29 SP 한 줄 */
+.spwrap .autosp { min-height: 32px !important; font-size: 12px !important; padding: 4px 10px !important; margin-left: 6px; flex: none; }
+/* C31 터치 영역·대비 */
+.info { position: relative; } .info::after { content: ''; position: absolute; inset: -10px; }
+:root { --mute: #A3B8AB; }
