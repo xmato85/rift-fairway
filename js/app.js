@@ -519,6 +519,7 @@
         '<b>장비 8부위</b><div class="grid">' + slots + '</div>' +
         '<b style="margin-top:8px">설정</b>' +
         '<button class="btn ghost" data-a="replayTutorial">튜토리얼 다시 보기</button>' +
+        '<button class="btn ghost" data-a="chPractice">3홀 챌린지 연습 다시 하기</button>' +
         '<button class="btn ghost" data-a="replayIntro">인트로 다시 보기</button>' +
         (S.member.is_demo === 'Y' ? '<button class="btn danger" data-a="resetDemo">시연 초기화</button>' : '') +
         '<button class="btn ghost" data-a="logout">로그아웃</button>');
@@ -800,12 +801,12 @@
     },
     /* GM-09 일일 미션 */
     missions: function (p) {
-      var d = p.data, GO = { HUNT_START: 'map', HUNT_CLAIM: 'hunt', CRAFT: 'craft', COMPOSE: 'mat', HUNT_MINUTES: 'hunt', RAID_FINISH: 'dungeon' };
-      var rw = function (r) { return [r.gold ? fmt(r.gold) + 'G' : '', Object.keys(r.materials || {}).map(function (k) { return matName(k) + ' ' + r.materials[k]; }).join(' ')].filter(Boolean).join(' + '); };
+      var d = p.data, GO = { HUNT_START: 'map', HUNT_CLAIM: 'hunt', CRAFT: 'craft', COMPOSE: 'mat', HUNT_MINUTES: 'hunt', RAID_FINISH: 'dungeon', CH3_FINISH: 'ch' };
+      var rw = function (r) { return [r.gold ? fmt(r.gold) + 'G' : '', Object.keys(r.materials || {}).map(function (k) { return matName(k) + ' ' + r.materials[k]; }).join(' '), r.tickets ? '3홀 챌린지 이용권 ' + r.tickets + '장' : ''].filter(Boolean).join(' + '); };
       var body = !d ? '<p class="sub">불러오는 중…</p>' : d.missions.slice().sort(function (a, b) { return a.order - b.order; }).map(function (m) {
         var prog = Math.min(m.progress, m.target), all = m.event_type === 'ALL_CLEAR';
         var btn = m.claimed ? '<span class="small">수령 완료</span>' : m.done ? '<button class="chip on" data-a="missionClaim" data-v="' + m.mission_id + '">받기</button>'
-          : GO[m.event_type] ? '<button class="chip" data-a="missionGo" data-v="' + GO[m.event_type] + '">바로가기</button>' : '';
+          : GO[m.event_type] ? '<button class="chip" data-a="missionGo" data-v="' + GO[m.event_type] + '">' + (m.event_type === 'CH3_FINISH' ? '도전하기' : '바로가기') + '</button>' : '';
         return '<div class="mission' + (all ? ' all' : '') + (m.claimed ? ' got' : '') + '"><div style="flex:1"><b>' + esc(m.name) + '</b><p class="small">' + (m.event_type === 'HUNT_MINUTES' ? '누적 사냥 ' + prog + '/' + m.target + '분' : prog + '/' + m.target) + ' · 보상 ' + esc(rw(m.reward)) + '</p>' +
           '<div class="bar" style="height:6px"><i style="width:' + (prog / m.target * 100) + '%"></i></div></div>' + btn + '</div>';
       }).join('');
@@ -920,6 +921,7 @@
     // GZ-02 첫 진입 안내: ID/PW 로그인 후 골프존앱 메인에서 [게임] 탭으로 모험 시작(인트로를 아직 안 본 회원, v0.5 보완)
     if (view.name === 'launcher') return S && S.member.intro_seen !== 'Y' && !TUT.gameHintOff && !popup
       ? { sel: '.gzm-game', text: ['[게임] 탭을 눌러 보세요!', '균열의 페어웨이의 세계로 모험을 떠나 볼까요?'], face: 'pino_cheer', launch: true } : null;
+    if (view.name === 'chPlay') return CHC.practice && CHC.coach !== null && !popup && CHC.phase === 'ready' ? Object.assign({ chp: true }, CH_COACH[CHC.coach]) : null;
     if (view.name === 'dgRaid') return D.coach !== null && D.coach !== undefined && !popup ? Object.assign({ raid: true }, RAID_COACH[D.coach]) : null;
     if (['map', 'courses', 'hunt', 'craft', 'items', 'char'].indexOf(view.name) < 0 || !tutActive()) return null;
     return tutSpec();
@@ -942,6 +944,7 @@
     var pos = !r ? 'top:' + (H / 2 - 60) + 'px' : below ? 'top:' + (r.y + r.h + 10) + 'px' : 'bottom:' + (H - r.y + 10) + 'px';
     if (popup && r && !below) pos = 'top:10px'; // v1.0.3 C16: 팝업 내용(무엇을 만들었는지 등)을 가리지 않게 화면 위쪽에
     var btns = sp.launch ? '<button class="small" data-a="gameHintOff">나중에</button><button class="chip on" data-a="enterGame">게임 탭으로</button>'
+      : sp.chp ? '<button class="small" data-a="chCoachEnd">닫기</button><span class="small">' + (CHC.coach + 1) + '/' + CH_COACH.length + '</span><button class="chip on" data-a="chCoachNext">' + (CHC.coach < CH_COACH.length - 1 ? '다음' : '확인') + '</button>'
       : sp.raid ? '<button class="small" data-a="coachClose">닫기</button><button class="chip on" data-a="coachNext">' + (D.coach < RAID_COACH.length - 1 ? '다음' : '확인') + '</button>'
       : sp.replay ? '<button class="small" data-a="tutReplayEnd">닫기</button><span class="small">' + tutCur() + '/6</span><button class="chip on" data-a="tutReplayNext">' + (tutCur() < 6 ? '다음' : '완료') + '</button>'
         : '<button class="small" data-a="tutSkip">건너뛰기</button><span class="small">' + tutLabel() + '</span>' + (sp.go ? '<button class="chip on" data-a="' + sp.go[0] + '">' + sp.go[1] + '</button>' : '') + (sp.ok ? '<button class="chip on" data-a="tutOk">' + sp.ok + '</button>' : '');
@@ -1059,21 +1062,22 @@
       var ms = popup && popup.type === 'missions' && popup.data && (popup.data.missions || []).filter(function (x) { return x.mission_id === d.v; })[0];
       if (ms && ms.done && !ms.claimed) { // 보상은 기준 데이터로 정해져 있으므로 바로 반영
         var r0 = ms.reward || {}; ms.claimed = true; ms.claimed_at = new Date(now()).toISOString();
-        S.wallet.gold += r0.gold || 0; addMats(r0.materials || {}); render();
-        toast('미션 보상 ' + [r0.gold ? fmt(r0.gold) + 'G' : '', Object.keys(r0.materials || {}).map(function (k) { return matName(k) + ' ' + r0.materials[k]; }).join(' ')].filter(Boolean).join(' + '));
-        commit('missionClaim', { mission_id: d.v }, function (data) { claimAt = Date.now(); LAST.missions = missionsFix(data.missions); if (popup && popup.type === 'missions') { popup.data = LAST.missions; render(); } });
+        S.wallet.gold += r0.gold || 0; addMats(r0.materials || {}); if (r0.tickets && S.chances) S.chances.tickets = Math.min(S.chances.ticket_max || 10, (S.chances.tickets || 0) + r0.tickets); render();
+        toast('미션 보상 ' + [r0.gold ? fmt(r0.gold) + 'G' : '', Object.keys(r0.materials || {}).map(function (k) { return matName(k) + ' ' + r0.materials[k]; }).join(' '), r0.tickets ? '이용권 ' + r0.tickets + '장' : ''].filter(Boolean).join(' + '));
+        commit('missionClaim', { mission_id: d.v }, function (data) { claimAt = Date.now(); if (data.chances) S.chances = data.chances; LAST.missions = missionsFix(data.missions); if (popup && popup.type === 'missions') { popup.data = LAST.missions; render(); } });
         return;
       }
       act('missionClaim', { mission_id: d.v }).then(function (res) {
         if (!res.ok) { toast(res.error.message); render(); return; }
-        S.wallet = res.data.wallet; if (res.data.materials) S.materials = res.data.materials;
+        S.wallet = res.data.wallet; if (res.data.materials) S.materials = res.data.materials; if (res.data.chances) S.chances = res.data.chances;
         if (popup && popup.type === 'missions') popup.data = res.data.missions;
         render();
-        var r = res.data.reward; toast('미션 보상 ' + [r.gold ? fmt(r.gold) + 'G' : '', Object.keys(r.materials || {}).map(function (k) { return matName(k) + ' ' + r.materials[k]; }).join(' ')].filter(Boolean).join(' + '));
+        var r = res.data.reward; toast('미션 보상 ' + [r.gold ? fmt(r.gold) + 'G' : '', Object.keys(r.materials || {}).map(function (k) { return matName(k) + ' ' + r.materials[k]; }).join(' '), r.tickets ? '이용권 ' + r.tickets + '장' : ''].filter(Boolean).join(' + '));
       });
     },
     missionGo: function (d) {
       popup = null;
+      if (d.v === 'ch') { A.chOpen(); return; }
       if (d.v === 'mat') go('items', { tab: 'mat' }); else if (d.v === 'hunt') go(S.hunt ? 'hunt' : 'map'); else go(d.v);
     },
     rank: function () {
@@ -2407,7 +2411,7 @@
   /* ---- 미션(B-58): 이름·한 번에 받기·KST ---- */
   var _missions = POPUPS.missions;
   POPUPS.missions = function (p) {
-    var html = _missions(p).replace(/레이드 참여/g, '레이드 완료(체험 제외)').replace('매일 00:00 초기화', '매일 00:00(한국 시간) 초기화').replace('레이드 참여는 선택', '레이드는 선택');
+    var html = _missions(p).replace(/레이드 참여/g, '레이드 완료(체험 제외)').replace('매일 00:00 초기화', '매일 00:00(한국 시간) 초기화').replace('레이드 참여는 선택', '레이드는 선택').replace('6개 중 5개를 완료하면 올클리어', '7개 중 6개를 완료하면 올클리어 · 이용권 1장 지급(최대 10장 보관)');
     var ready = p.data && (p.data.missions || []).filter(function (m) { return m.done && !m.claimed; }).length;
     // v1.0.3 A2: [한 번에 받기] 삭제(하나씩 받기만)
     return html;
@@ -2529,6 +2533,434 @@
   }, 1000);
   setInterval(function () { if (view.name === 'hunt' && !document.hidden && S && S.hunt) huntAttack(); }, 1600);
 
+  /* ================= 3홀 챌린지 (v1.1) =================
+   * 유저의 임팩트 입력으로만 진행하는 연속 3홀. 화면은 같은 엔진(Engine.ch)으로 결과를 바로 그리고, 서버(challengeShot)가 뒤에서 같은 계산으로 확정한다.
+   * 게임용 가상 샷·스코어이며 실제 GS 샷·핸디캡 기록과 섞지 않는다. 지도는 코드(SVG)로 그린 간략 지도(경로 좌표는 엔진의 레이아웃 메타데이터). */
+  var CHC = { r: null, S: null, st: null, disp: null, phase: 'ready', pose: 'idle', p: 0.5, t0: 0, raf: 0, unsent: [], flushing: false, syncErr: false, hist: {},
+    practice: false, coach: null, trails: [[], [], []], anim: null, holeEnd: null, loading: false, taps: [], speed: 'slow', busyPick: false };
+  try { CHC.speed = localStorage.getItem('rf_ch_speed') === 'fast' ? 'fast' : 'slow'; } catch (e) {}
+  var CH_PALS = {
+    METRO: { bg: '#2d5a3f', fl: '#4f8c63', fair: '#6fb77f', green: '#9be08c', ge: '#3f7f4b', t1: '#1f4a32', t2: '#2f6b4a', wa: '#4a86c5', tee: '#cfe9d0' },
+    GANGWON: { bg: '#264a33', fl: '#3f7650', fair: '#5ea06b', green: '#8fd48a', ge: '#2f6a43', t1: '#173a27', t2: '#245a3a', wa: '#4f86b5', tee: '#cbe5cf' },
+    CHUNGCHEONG: { bg: '#4a5a34', fl: '#7a8c4f', fair: '#a2b867', green: '#c8e48b', ge: '#667a3d', t1: '#3a4a28', t2: '#58703a', wa: '#5b97c0', tee: '#e6efc9' },
+    JEOLLA: { bg: '#2f6140', fl: '#559a63', fair: '#7cc986', green: '#a8ee93', ge: '#44864f', t1: '#214f33', t2: '#33783f', wa: '#4a8ac8', tee: '#d3efd1' },
+    GYEONGSANG: { bg: '#44593a', fl: '#6f8a52', fair: '#94b66c', green: '#bde48e', ge: '#5d7a43', t1: '#33472b', t2: '#4c6b38', wa: '#5593c4', tee: '#e2efc9' },
+    JEJU: { bg: '#2c5d52', fl: '#4b8f82', fair: '#78c4ae', green: '#a7ecd0', ge: '#3d8a78', t1: '#1d4a42', t2: '#2f7364', wa: '#3aa0b8', tee: '#d6efe7' },
+    OVERSEAS: { bg: '#5a5a38', fl: '#8e8d58', fair: '#b9bb74', green: '#dcec9a', ge: '#767744', t1: '#444428', t2: '#66673a', wa: '#5b9ec6', tee: '#efefc9' },
+    VIRTUAL: { bg: '#3d3a63', fl: '#605b9a', fair: '#8a84cf', green: '#b9b3f2', ge: '#4f4a86', t1: '#2b2850', t2: '#45407a', wa: '#6a8ee0', tee: '#e3e0fb' }
+  };
+  var CH_MAPCACHE = {};
+  function chCfg() { return Engine.ch.cfg(M); }
+  function chRegion() { return CHC.S ? CHC.S.region_id : 'METRO'; }
+  function chRng(str) { var h = 1779033703; for (var i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = h << 13 | h >>> 19; } return function () { h = Math.imul(h ^ h >>> 16, 2246822507); h = Math.imul(h ^ h >>> 13, 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; }; }
+  function chMinDist(g, x, y) { var m = 1e9; for (var i = 0; i < g.D.length; i++) { var d = Math.hypot(g.D[i][0] - x, g.D[i][1] - y); if (d < m) m = d; } return m; }
+  /** 지도 배경(코드로 그림): 러프·페어웨이(경로 폭)·그린·티박스·장식(경로 밖에만). 공·궤적·홀컵·글자는 여기에 넣지 않는다 */
+  function chMapStatic(h, region) {
+    var key = h.layout_id + '|' + h.dist + '|' + region + '|' + (APP_CONFIG.CH_IMAGES ? 'i' : 'c'); if (CH_MAPCACHE[key]) return CH_MAPCACHE[key];
+    var pal = CH_PALS[region] || CH_PALS.METRO, g = Engine.ch.geom(h.layout_id, h.dist), HH = g.H, out;
+    if (APP_CONFIG.CH_IMAGES) { // GPT 지도 이미지 + 지역 색을 아주 약하게 입힘(8색 변형 이미지를 따로 만들지 않음)
+      out = '<rect x="-300" y="-300" width="900" height="' + (HH + 600).toFixed(0) + '" fill="#5f9a2e"/>' +
+        // 화면 비율이 지도보다 넓을 때 양옆 여백: 같은 지도를 크게 흐리게 깔아 자연스럽게 이어 보이게 함
+        '<image href="' + asset('ch_map_' + h.layout_id + '.png') + '" x="-170" y="-60" width="640" height="' + (HH + 120).toFixed(0) + '" preserveAspectRatio="xMidYMid slice" style="filter:blur(7px)" opacity=".9"/>' +
+        '<image href="' + asset('ch_map_' + h.layout_id + '.png') + '" x="0" y="0" width="300" height="' + HH.toFixed(2) + '" preserveAspectRatio="none"/>' +
+        '<rect x="0" y="0" width="300" height="' + HH.toFixed(2) + '" fill="' + pal.bg + '" opacity=".16"/>';
+      return (CH_MAPCACHE[key] = out);
+    }
+    var r = chRng('chmap:' + h.layout_id), x, y, i, w0 = g.wd[0];
+    out = '<rect x="-300" y="-300" width="900" height="' + (HH + 600).toFixed(0) + '" fill="' + pal.bg + '"/>'; var pond = false, placed = 0;
+    for (i = 0; i < 40 && !pond; i++) { x = 30 + r() * 240; y = 30 + r() * (HH - 60); if (chMinDist(g, x, y) > w0 / 2 + 46) { out += '<ellipse cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" rx="24" ry="13" fill="' + pal.wa + '" stroke="#fff" stroke-opacity=".5" stroke-width="1.5"/>'; pond = true; } }
+    for (i = 0; i < 90 && placed < 22; i++) {
+      x = 8 + r() * 284; y = 8 + r() * (HH - 16); var f = r();
+      if (chMinDist(g, x, y) > w0 / 2 + 22) { out += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (6 + r() * 5).toFixed(1) + '" fill="' + (f > 0.5 ? pal.t1 : pal.t2) + '" stroke="#0b1712" stroke-width="1.2"/>'; placed++; }
+    }
+    var seg = function (col, extra) { var o = ''; for (var k = 1; k < g.D.length; k++) o += '<line x1="' + g.D[k - 1][0].toFixed(1) + '" y1="' + g.D[k - 1][1].toFixed(1) + '" x2="' + g.D[k][0].toFixed(1) + '" y2="' + g.D[k][1].toFixed(1) + '" stroke="' + col + '" stroke-width="' + (g.wd[k] + extra).toFixed(1) + '" stroke-linecap="round"/>'; return o; };
+    out += seg(pal.fl, 14) + seg(pal.fair, 0);
+    var hp = g.D[g.D.length - 1], t0 = g.D[0], gr = g.greenM * g.scale;
+    out += '<circle cx="' + hp[0].toFixed(1) + '" cy="' + hp[1].toFixed(1) + '" r="' + gr.toFixed(1) + '" fill="' + pal.green + '" stroke="' + pal.ge + '" stroke-width="2.5"/>';
+    out += '<rect x="' + (t0[0] - 15).toFixed(1) + '" y="' + (t0[1] - 3).toFixed(1) + '" width="30" height="10" rx="2" fill="' + pal.tee + '" stroke="' + pal.ge + '"/>';
+    return (CH_MAPCACHE[key] = out);
+  }
+  /** 홀컵·깃발은 지도 위에 코드로 얹음(배경에 굽지 않음) */
+  function chPin(g) { var hp = g.D[g.D.length - 1]; return '<circle cx="' + hp[0].toFixed(1) + '" cy="' + hp[1].toFixed(1) + '" r="2.2" fill="#10261a"/><line x1="' + hp[0].toFixed(1) + '" y1="' + hp[1].toFixed(1) + '" x2="' + hp[0].toFixed(1) + '" y2="' + (hp[1] - 20).toFixed(1) + '" stroke="#fff" stroke-width="1.4"/><path d="M' + hp[0].toFixed(1) + ' ' + (hp[1] - 20).toFixed(1) + 'l11 4-11 4z" fill="#e24b4a"/>'; }
+  function chHoleOf(st) { return CHC.S.holes[Math.min(st.i, CHC.S.holes.length - 1)]; }
+  function chGeomOf(h) { return Engine.ch.geom(h.layout_id, h.dist); }
+  /** 카메라: 그린 안이면 그린 확대, PAR6은 공을 따라가며 확대, 그 외는 전체 */
+  function chViewBox(g, h, d) {
+    var hp = g.D[g.D.length - 1], rem = Engine.ch.remain(g, d), b = Engine.ch.xy(g, d.s, d.lat), asp = g.H / 300, w, hh;
+    if (rem <= g.greenM) { w = 120; hh = w * asp; return { vb: (hp[0] - w / 2).toFixed(1) + ' ' + (hp[1] - hh / 2).toFixed(1) + ' ' + w + ' ' + hh.toFixed(1), z: 0.4, green: true }; }
+    if (h.par >= 6) { w = 190; hh = w * asp; var x = Math.max(0, Math.min(300 - w, b.x - w / 2)), y = Math.max(0, Math.min(g.H - hh, b.y - hh / 2)); return { vb: x.toFixed(1) + ' ' + y.toFixed(1) + ' ' + w + ' ' + hh.toFixed(1), z: 0.65, green: false }; }
+    return { vb: '0 0 300 ' + g.H.toFixed(1), z: 1, green: false };
+  }
+  function chOverlayHtml(g, d, z) {
+    var trail = CHC.trails[d.i] || [], tee = Engine.ch.xy(g, 0, 0), line = 'M' + tee.x.toFixed(1) + ' ' + tee.y.toFixed(1), out = '', i;
+    for (i = 0; i < trail.length; i++) line += 'L' + trail[i][0].toFixed(1) + ' ' + trail[i][1].toFixed(1);
+    out += chPin(g) + '<path d="' + line + '" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="' + (1.6 * z) + '" stroke-dasharray="' + (5 * z) + ' ' + (4 * z) + '"/>';
+    for (i = 0; i < trail.length; i++) out += '<circle cx="' + trail[i][0].toFixed(1) + '" cy="' + trail[i][1].toFixed(1) + '" r="' + (5 * z) + '" fill="#12261d" stroke="#F6C445" stroke-width="' + (1.2 * z) + '"/><text x="' + trail[i][0].toFixed(1) + '" y="' + (trail[i][1] + 3.4 * z).toFixed(1) + '" font-size="' + (9 * z) + '" text-anchor="middle" fill="#fff">' + (i + 1) + '</text>';
+    var b = Engine.ch.xy(g, d.s, d.lat);
+    return out + '<circle id="chBall" cx="' + b.x.toFixed(1) + '" cy="' + b.y.toFixed(1) + '" r="' + (4 * z) + '" fill="#fff" stroke="#111" stroke-width="' + (1.2 * z) + '"/>';
+  }
+  /** 임시 골퍼(코드로 그림). GOLFER_IMAGES=true로 GPT 이미지(golfer_{m|f}_{driver|iron|putter}_{back|impact|finish}.webp)를 쓰면 교체 */
+  function chGolferSrc(gen, ck, pose) { return asset('golfer_' + (gen === 'F' ? 'f' : 'm') + '_' + ck + '_' + (pose === 'idle' ? 'impact' : pose) + '.png'); }
+  function chPreload(gen) { ['driver', 'iron', 'putter'].forEach(function (c) { ['back', 'impact', 'finish'].forEach(function (p) { var im = new Image(); im.src = chGolferSrc(gen, c, p); }); }); }
+  function chGolfer(gen, club, pose) {
+    var f = gen === 'F', ck = { DRIVER: 'driver', IRON: 'iron', PUTTER: 'putter' }[club] || 'iron';
+    if (APP_CONFIG.GOLFER_IMAGES) return '<img class="gimg" src="' + chGolferSrc(f ? 'F' : 'M', ck, pose) + '" alt="">';
+    var Lg = { DRIVER: 40, IRON: 34, PUTTER: 24 }[club] || 34, putt = club === 'PUTTER';
+    var ang = { idle: 20, back: putt ? 38 : 150, impact: -4, finish: putt ? -42 : -150 }[pose], lean = pose === 'finish' ? -7 : pose === 'back' ? 5 : 0;
+    var hair = f ? '<path d="M21 12q0-10 10-9 8 1 8 9z" fill="#5a3b2a" stroke="#111" stroke-width="1.6"/><path d="M38 7q10 3 6 17-5-5-6-11z" fill="#5a3b2a" stroke="#111" stroke-width="1.6"/><path d="M20 9q10-5 20 0v3H20z" fill="#fff" stroke="#111" stroke-width="1.4"/>'
+      : '<path d="M21 10q0-9 10-8 8 1 8 8z" fill="#3b2a22" stroke="#111" stroke-width="1.6"/><path d="M20 9q10-6 20 0v2H20z" fill="#2f6b4a" stroke="#111" stroke-width="1.4"/>';
+    var legs = f ? '<path d="M21 44h20l3 10H18z" fill="#fff" stroke="#111" stroke-width="2"/><path d="M24 54v18M38 54v18" stroke="#111" stroke-width="5"/>' : '<path d="M23 46v26M37 46v26" stroke="#111" stroke-width="5.5"/>';
+    return '<svg viewBox="0 0 64 78" width="100%" height="100%"><g transform="rotate(' + lean + ' 31 72)"><circle cx="30" cy="13" r="8" fill="#f2c9a0" stroke="#111" stroke-width="2"/>' + hair +
+      '<path d="M21 25q10-6 20 0l-1 21H22z" fill="#4CC38A" stroke="#111" stroke-width="2"/>' + legs +
+      '<g transform="rotate(' + ang + ' 31 34)"><line x1="31" y1="34" x2="31" y2="' + (34 + Lg) + '" stroke="#e8edf0" stroke-width="3" stroke-linecap="round"/><rect x="26" y="' + (32 + Lg) + '" width="11" height="5" rx="2" fill="#555" stroke="#111"/></g></g></svg>';
+  }
+  function chPose() { var el = document.getElementById('chGolfer'); if (!el || !CHC.S) return; el.innerHTML = chGolfer(CHC.S.gender, CHC.club || 'IRON', CHC.pose); }
+  function chClone(o) { return JSON.parse(JSON.stringify(o)); }
+  /** 서버가 확정한 로그를 처음부터 다시 재생해 홀별 공 궤적을 복원(새로고침·이어 하기) */
+  function chReplay(S0, log) {
+    var st = Engine.ch.start(M, S0), trails = [[], [], []], hist = {};
+    log.forEach(function (e) {
+      if (e.p === null) return; // 컨시드 샷은 앞선 샷에서 자동으로 이어짐
+      var hi = st.i, o = Engine.ch.shot(M, S0, st, e.p); if (o.error) return;
+      o.evs.forEach(function (ev) { var g = chGeomOf(S0.holes[hi]), b = Engine.ch.xy(g, ev.to.s, ev.to.lat); if (!ev.conceded) trails[hi].push([b.x, b.y]); });
+      st = o.st; hist[st.n_shot] = JSON.stringify(st);
+    });
+    return { st: st, trails: trails, hist: hist };
+  }
+  function chAdopt(round) {
+    CHC.r = round; CHC.S = round.setup; if (APP_CONFIG.GOLFER_IMAGES) chPreload(round.setup.gender); var rp = chReplay(round.setup, round.state.log || []);
+    CHC.st = round.state; CHC.trails = rp.trails; CHC.hist = rp.hist; CHC.disp = chClone(round.state); CHC.unsent = []; CHC.syncErr = false; CHC.anim = null;
+    CHC.phase = 'ready'; CHC.pose = 'idle'; CHC.holeEnd = null; CHC.club = null;
+    S.challenge = round.status === 'ACTIVE' || round.status === 'RESULT' ? { round_id: round.round_id, status: round.status } : null;
+  }
+  function chEnter(round) {
+    chAdopt(round);
+    if (round.status === 'ACTIVE') go(round.state.n_shot === 0 ? 'chReady' : 'chPlay');
+    else go('chResult');
+  }
+  // ---- 남은 횟수: 매일 기본 2회(한국 시간 00:00 초기화) → 다 쓰면 누적 이용권(최대 10장) 1장씩 ----
+  function chChancesNow() {
+    var c = S.chances || { basic_total: 2, basic_used: 0, tickets: 0, ticket_max: 10, date: '' }, today = new Date(now() + 9 * 3600000).toISOString().slice(0, 10), used = c.date === today ? c.basic_used : 0;
+    return { left: c.unlimited ? c.basic_total : Math.max(0, c.basic_total - used), total: c.basic_total, tickets: c.tickets || 0, max: c.ticket_max || 10, unlimited: !!c.unlimited };
+  }
+  function chChanceText(c) { return '오늘 기본 ' + c.left + '/' + c.total + '회 · 이용권 ' + c.tickets + '장'; }
+  // ---- 던전 탭 카드 ----
+  function chCardHtml() {
+    var cn = chChancesNow(), noChance = !cn.unlimited && cn.left <= 0 && cn.tickets <= 0;
+    var c = S.challenge, txt = c ? (c.status === 'RESULT' ? '지난 원정의 보상을 선택해 주세요' : '진행 중인 원정이 있어요 · 이어서 칠 수 있어요') : noChance ? '오늘 기본 ' + cn.total + '회 완료 · 일일 미션 올클리어로 이용권 +1' : chChanceText(cn) + ' · 연속 3홀 약 3~5분',
+      btn = c ? (c.status === 'RESULT' ? '보상 선택하기' : '이어 하기') : noChance ? '일일 미션 보기' : cn.left <= 0 && !cn.unlimited ? '이용권 1장으로 시작' : '3홀 챌린지 시작', act0 = noChance && !c ? 'missions' : 'chOpen';
+    return '<div class="card chcard">' + (APP_CONFIG.CH_IMAGES ? '<img class="chbanner" src="' + asset('ch_banner.png') + '" alt="">' : '') + '<div class="row" style="justify-content:flex-start;gap:12px">' + (APP_CONFIG.CH_IMAGES ? '' : '<div class="chico">' + chGolfer(S.member.gender === 'F' ? 'F' : 'M', 'DRIVER', 'impact') + '</div>') + '<div style="flex:1"><b style="font-size:17px">3홀 챌린지</b><p class="sub">내 손끝의 샷이 캐릭터의 공격으로!</p><p class="small">' + txt + '</p>' + (!c && !chSeen() ? '<p class="small"><b style="color:var(--gold,#d9a441)">오늘 할 일</b> · 연습 3샷으로 방법 익히기 <button class="chip" data-a="chPractice">연습하기</button></p>' : '') + '</div></div>' +
+      '<button class="btn gold" data-a="' + act0 + '">' + btn + '</button></div>';
+  }
+  var _dungeonCh = SCREENS.dungeon;
+  SCREENS.dungeon = function (p) {
+    var html = _dungeonCh(p), mark = '<span class="simbadge">체험 레이드</span></div>', k = html.indexOf(mark);
+    if (k >= 0) return html.slice(0, k + mark.length) + chCardHtml() + html.slice(k + mark.length);
+    return html.replace('<div class="scroll">', '<div class="scroll">' + chCardHtml());
+  };
+  A.chOpen = function () {
+    if (CHC.loading) return; CHC.loading = true;
+    Api.call('challengeStatus', {}, { read: true }).then(function (res) {
+      CHC.loading = false;
+      if (!res.ok) { toast(res.error.message); return; }
+      if (res.data.chances) S.chances = res.data.chances;
+      if (res.data.round) chEnter(res.data.round); else go('chIntro');
+    });
+  };
+  // ---- 연습 3샷(첫 이용 안내): 서버 저장·횟수 차감·보상·미션 없음, 한 홀만 ----
+  var CH_COACH = [
+    { sel: '.ch-gauge', text: ['게이지가 움직여요', '가운데(노란 칸)에 맞춰 [임팩트!]를 눌러요'] },
+    { sel: '.ch-info', text: ['클럽·남은 거리·타수를 확인해요', '타수가 적을수록 홀 종료 공격이 커져요'] },
+    { sel: '#chBoss', text: ['샷마다 보스를 공격해요', '연습 3샷은 횟수·보상이 없어요'], face: 'pino_cheer' }
+  ];
+  function chSeen() { return !!(S.tutorial && S.tutorial.ch_guide_seen); }
+  var chPrev = null;
+  A.chPractice = function () {
+    var j = mainJob(), r0 = { round_id: 'PRACTICE', status: 'ACTIVE' }, setup = Engine.ch.setup(M, { seed: 'PRACTICE-' + now(), gender: S.member.gender === 'F' ? 'F' : 'M', jobId: j, cp: cpOf(j), tier: 1 });
+    setup.look = lookOf(j); setup.holes = setup.holes.slice(0, 1);
+    chPrev = S.challenge; r0.setup = setup; r0.state = Engine.ch.start(M, setup);
+    chAdopt(r0); S.challenge = chPrev; CHC.practice = true; CHC.coach = 0; go('chPlay');
+  };
+  function chPracticeLeave() { CHC.practice = false; CHC.coach = null; CHC.r = null; S.challenge = chPrev; }
+  function chPracticeEnd() {
+    cancelAnimationFrame(CHC.raf); chPracticeLeave(); CHC.phase = 'ready'; CHC.holeEnd = null;
+    if (S.tutorial && !S.tutorial.ch_guide_seen) { S.tutorial.ch_guide_seen = new Date(now()).toISOString(); act('raidGuideSeen', { kind: 'ch' }); }
+    go('dungeon');
+    popup = { type: 'confirm', title: '연습 끝!', text: '이제 3홀 챌린지를 시작해 볼까요? 본 게임은 3홀을 이어서 치고, 끝나면 재료를 골라 받아요.', yes: '소개 보기', no: '나중에', run: function () { go('chIntro'); } }; render();
+  }
+  A.chCoachNext = function () { if (CHC.coach < CH_COACH.length - 1) { CHC.coach++; render(); } else A.chCoachEnd(); };
+  A.chCoachEnd = function () { CHC.coach = null; render(); };
+  // ---- 소개 / 준비 ----
+  SCREENS.chIntro = function () {
+    return dgScreen('<div class="row"><b style="font-size:20px">3홀 챌린지</b><span class="simbadge">게임용 가상 샷</span></div>' +
+      '<p class="sub" style="text-align:center">내 손끝의 샷이 캐릭터의 공격으로!</p>' +
+      '<ol class="gsflow"><li><span class="k">1</span><b>가운데에 맞춰 임팩트</b></li><li style="animation-delay:.3s"><span class="k">2</span><b>내 캐릭터가 보스를 공격</b></li><li style="animation-delay:.6s"><span class="k">3</span><b>원하는 재료를 골라 받기</b></li></ol>' +
+      '<p class="small">연속 3홀 · 약 3~5분 · 제한시간 없음 · 실제 GS 라운드 기록과는 별개예요</p>' +
+      '<div class="card"' + (chSeen() ? '' : ' style="border-color:var(--gold,#d9a441)"') + '><div class="row"><b>' + (chSeen() ? '연습해 보기' : '처음이라면 연습 3샷부터') + '</b><button class="chip' + (chSeen() ? '' : ' on') + '" data-a="chPractice">연습하기</button></div><p class="small">한 홀만 3샷 · 횟수·보상·미션과 무관해요</p></div>' +
+      '<div class="card"><div class="row"><b>' + chChanceText(chChancesNow()) + '</b><span class="small">이용권 최대 ' + chChancesNow().max + '장</span></div><p class="small">매일 00:00(한국 시간)에 기본 2회가 새로 생겨요. 기본을 다 쓰면 이용권이 1장씩 쓰이고, 이용권은 일일 미션 올클리어로 받아요.</p></div>' +
+      '<div style="flex:1"></div>' + (function () { var cn = chChancesNow(), none = !cn.unlimited && cn.left <= 0 && cn.tickets <= 0; return none ? '<button class="btn gold" data-a="missions">일일 미션 보기</button>' : '<button class="btn gold" data-a="chStart"' + (CHC.loading ? ' disabled' : '') + '>' + (CHC.loading ? '준비 중…' : cn.left <= 0 && !cn.unlimited ? '이용권 1장으로 시작' : '3홀 시작') + '</button>'; })());
+  };
+  A.chStart = function () {
+    var cn = chChancesNow();
+    if (!cn.unlimited && cn.left <= 0 && cn.tickets <= 0) { toast('오늘 기본 ' + cn.total + '회를 모두 했어요 · 일일 미션 올클리어로 이용권을 받을 수 있어요'); return; }
+    if (!cn.unlimited && cn.left <= 0) { popup = { type: 'confirm', title: '이용권을 사용할까요?', text: '오늘 기본 ' + cn.total + '회를 모두 써서 이용권 1장을 사용해요. (남은 이용권 ' + (cn.tickets - 1) + '장)', yes: '사용하고 시작', no: '취소', run: chDoStart }; render(); return; }
+    chDoStart();
+  };
+  function chDoStart() {
+    if (CHC.loading) return; CHC.loading = true; render();
+    act('challengeStart', {}).then(function (res) {
+      CHC.loading = false;
+      if (res.ok && res.data.chances) S.chances = res.data.chances;
+      if (!res.ok && res.error.chances) { S.chances = res.error.chances; toast(res.error.message); render(); return; }
+      if (!res.ok) { if (res.error.round) { toast(res.error.message); chEnter(res.error.round); return; } toast(res.error.message); render(); return; }
+      chEnter(res.data.round);
+    });
+  };
+  SCREENS.chReady = function () {
+    var S0 = CHC.S; if (!S0) return SCREENS.dungeon();
+    var zone = M.diffZones.filter(function (z) { return z.zone === S0.zone; })[0], reg = IX.region[S0.region_id], boss = IX.boss[S0.boss_id], rs = S0.settings;
+    var holes = S0.holes.map(function (h) { return '<div class="chhole"><b>' + h.hole + 'H</b><span>PAR ' + h.par + '</span><span>' + h.dist + 'm</span><em>' + esc(Engine.ch.layout(h.layout_id).name) + '</em></div>'; }).join('');
+    return dgScreen('<div class="row"><b style="font-size:20px">원정 준비</b><span class="simbadge">게임용 가상 샷</span></div>' +
+      '<div class="bossbox"><img src="' + bossImg(S0.boss_id) + '" alt="" onerror="this.remove()"><div class="bossname">' + esc(boss.name) + '</div></div>' +
+      '<ol class="gsflow"><li><span class="k">코스</span><b>' + esc(S0.course_name) + (reg ? ' <span class="reg">' + esc(reg.name) + '</span>' : '') + '</b></li>' +
+      '<li style="animation-delay:.3s"><span class="k">대상 3홀 (실제 코스 기준)</span><div class="chholes">' + holes + '</div><span class="small">지도는 게임용 레이아웃이에요 · 실제 코스 지도가 아니에요</span></li>' +
+      '<li style="animation-delay:.6s"><span class="k">라운드 설정</span><div class="fv"><span class="rsets">' + Object.keys(rs).map(function (k) { return '<span><i>' + esc(k) + '</i><em>' + esc(rs[k]) + '</em></span>'; }).join('') + '</span></div></li>' +
+      '<li style="animation-delay:.9s"><span class="k">난이도</span><b>' + esc(S0.zone) + ' · ' + esc(zone.bossRank) + ' 보스</b><span class="small">점수 ' + S0.diff_score + ' · 보스 HP ' + fmt(S0.boss_hp) + ' · 최고 보상 ' + GRADE_NAME[zone.maxRewardGrade] + '</span></li></ol>' +
+      '<div style="flex:1"></div><button class="btn gold" data-a="chGo">티샷 시작</button><button class="small" data-a="chAbortAsk" style="padding:8px">원정 포기 (보상 없음)</button>');
+  };
+  A.chGo = function () { go('chPlay'); };
+  A.chAbortAsk = function () {
+    popup = { type: 'confirm', title: '원정을 포기할까요?', text: '포기하면 이번 원정의 보상을 받을 수 없어요.', yes: '포기하기', no: '계속하기', run: function () {
+      act('challengeFinish', { round_id: CHC.r.round_id, abort: true }).then(function (res) { if (res.ok) { S.challenge = null; CHC.r = null; go('dungeon'); } else toast(res.error.message); });
+    } }; render();
+  };
+  // ---- 플레이 ----
+  function chGaugeBg() {
+    var c = chCfg().cut, pc = function (v) { return (50 - v * 50).toFixed(1); }, pe = function (v) { return (50 + v * 50).toFixed(1); };
+    return 'linear-gradient(90deg,#b8474a 0 ' + pc(c[2]) + '%,#d9a441 ' + pc(c[2]) + '% ' + pc(c[1]) + '%,#7bc96f ' + pc(c[1]) + '% ' + pc(c[0]) + '%,#ffe27a ' + pc(c[0]) + '% ' + pe(c[0]) + '%,#7bc96f ' + pe(c[0]) + '% ' + pe(c[1]) + '%,#d9a441 ' + pe(c[1]) + '% ' + pe(c[2]) + '%,#b8474a ' + pe(c[2]) + '% 100%)';
+  }
+  function chHud(d, h, g) {
+    var C = chCfg(), rem = Engine.ch.remain(g, d), club = d.done ? 'PUTTER' : Engine.ch.club(C, h.par, d.strokes, rem, g.greenM);
+    return { club: club, rem: rem, clubName: { DRIVER: '드라이버', IRON: '아이언', PUTTER: '퍼터' }[club] };
+  }
+  SCREENS.chPlay = function () {
+    var S0 = CHC.S; if (!S0 || !CHC.disp) return SCREENS.dungeon();
+    var d = CHC.disp, h = chHoleOf(d), g = chGeomOf(h), hud = chHud(d, h, g), cam = chViewBox(g, h, d), boss = IX.boss[S0.boss_id];
+    CHC.club = hud.club;
+    var hpPct = Math.max(0, d.hp / S0.boss_hp * 100), look = S0.look || { stage: 0, set: 0 };
+    var hole = CHC.holeEnd ? '<div class="ch-holecard"><b class="hr ' + CHC.holeEnd.result_key + '">' + CHC.holeEnd.hole + 'H ' + esc(CHC.holeEnd.result) + '</b><p>PAR ' + CHC.holeEnd.par + ' · ' + CHC.holeEnd.strokes + '타' + (CHC.holeEnd.conceded ? ' (컨시드)' : '') + (CHC.holeEnd.capped ? ' · 홀이 끝났어요' : '') + '</p>' +
+      '<p class="small">샷 공격 ' + fmtR(CHC.holeEnd.shot_damage) + ' + 홀 종료 공격 ' + fmtR(CHC.holeEnd.E) + (CHC.holeEnd.sp_used ? ' · 특수공격 ×' + CHC.holeEnd.sp_mult : '') + '</p>' +
+      '<button class="btn gold" data-a="chNext">' + (CHC.practice ? '연습 끝내기' : CHC.st.done ? '결과 보기' : '다음 홀') + '</button></div>' : '';
+    var btnTxt = CHC.holeEnd ? '' : CHC.phase === 'swing' ? '임팩트!' : '샷 준비';
+    return '<div class="screen ch">' + (hiddenOn() ? '<div class="hidden-zone" data-a="chHidden"></div>' : '') +
+      '<div class="ch-head"><button class="ch-x" data-a="chExit" aria-label="나가기">‹</button><b>' + h.hole + 'H · PAR ' + h.par + '</b><span>' + (Math.min(d.i, 2) + 1) + '/3 · ' + h.dist + 'm (' + S0.tee + ')</span><span class="save' + (CHC.syncErr ? ' err' : '') + '" id="chSave">' + (CHC.syncErr ? '저장 실패' : CHC.unsent.length ? '저장 중…' : '저장됨') + '</span></div>' +
+      '<div class="ch-bosswrap"><div class="bossbox raid" id="chBoss"><div class="bossfig"><img class="bidle" src="' + bossImg(boss.id) + '" alt="" onerror="this.remove()"><img class="bhit" src="' + bossImg(boss.id, true) + '" alt="" onerror="this.remove()"></div><div class="fxlayer" id="chFx"></div>' +
+      '<div class="ch-rpg" id="chRpg">' + charPic(S0.job_id, look, 'idle', 'ch-rpgpic') + '</div><div class="ch-beam" id="chBeam"></div></div>' +
+      '<div class="ch-hp"><div class="row"><b id="chHpTxt">HP ' + fmtR(Math.max(0, d.hp)) + ' / ' + fmt(S0.boss_hp) + '</b><span class="small" id="chSpTxt">SP ' + Math.round(d.sp) + '/100 · 자동 사용</span></div><div class="bar hp"><i id="chHpBar" style="width:' + hpPct + '%"></i></div><div class="bar sp thin"><i id="chSpBar" style="width:' + Math.min(100, d.sp) + '%"></i></div></div></div>' +
+      '<div class="ch-map"><svg class="ch-svg" id="chSvg" viewBox="' + cam.vb + '">' + chMapStatic(h, chRegion()) + '<g id="chOv">' + chOverlayHtml(g, d, cam.z) + '</g></svg>' +
+      '<div class="ch-vd" id="chVd"></div><span class="ch-zoom" id="chZoom" style="display:' + (cam.green ? 'block' : 'none') + '">그린 확대</span><span class="ch-maptag">간략 지도 · 게임용 레이아웃</span>' +
+      '<div class="ch-golfer" id="chGolfer">' + chGolfer(S0.gender, hud.club, CHC.pose) + '</div>' + hole + '</div>' +
+      '<div class="ch-bot"><div class="row ch-info"><b id="chClub">' + hud.clubName + '</b><span id="chRem">남은 ' + Math.round(hud.rem) + 'm</span><span id="chStk">' + d.strokes + '타 / 최대 ' + h.par * chCfg().maxMult + '</span></div>' +
+      '<div class="ch-gauge" style="background:' + chGaugeBg() + '"><i class="ln"></i><i class="cu" id="chCu" style="left:' + (CHC.phase === 'swing' ? CHC.p * 100 : 50) + '%"></i></div>' +
+      (CHC.holeEnd ? '<button class="ch-btn" disabled>홀 종료</button>' : '<button class="ch-btn" id="chBtn" data-a="chBtn">' + btnTxt + '</button>') +
+      '<div class="row ch-sub"><button class="small" data-a="chSpeed" id="chSpeed">게이지 속도 · ' + (CHC.speed === 'fast' ? '보통' : '천천히') + '</button><span class="small">' + (CHC.syncErr ? '<button class="small" data-a="chRetry" style="color:var(--bad)">저장 다시 시도</button>' : '가운데에 가까울수록 좋은 샷') + '</span></div></div></div>';
+  };
+  // 게이지: 실제 경과 시간으로 한쪽 끝→반대쪽 끝(보통 2.4초·천천히 3.2초) 왕복. 입력 전까지 계속, 시간 초과 실패 없음
+  function chPAt(t) { var dur = CHC.speed === 'fast' ? 2400 : 3200, k = ((t - CHC.t0) / dur) % 2; return k > 1 ? 2 - k : k; }
+  function chTick(t) {
+    if (CHC.phase !== 'swing') return;
+    var p = chPAt(t);
+    CHC.p = p; var cu = document.getElementById('chCu'); if (cu) cu.style.left = (p * 100) + '%';
+    CHC.raf = requestAnimationFrame(chTick);
+  }
+  A.chSpeed = function () { CHC.speed = CHC.speed === 'fast' ? 'slow' : 'fast'; try { localStorage.setItem('rf_ch_speed', CHC.speed); } catch (e) {} var el = document.getElementById('chSpeed'); if (el) el.textContent = '게이지 속도 · ' + (CHC.speed === 'fast' ? '보통' : '천천히'); };
+  A.chBtn = function () {
+    if (CHC.phase === 'ready') {
+      if (CHC.syncErr) { A.chRetry(); return; }
+      if (CHC.unsent.length > 1) { toast('저장 중이에요. 잠시만요'); return; }
+      CHC.phase = 'swing'; CHC.pose = 'back'; CHC.t0 = performance.now(); chPose(); var b = document.getElementById('chBtn'); if (b) b.textContent = '임팩트!';
+      CHC.raf = requestAnimationFrame(chTick);
+    } else if (CHC.phase === 'swing') chImpact();
+  };
+  // 앱이 가려지면 일시정지: 확정 전 게이지는 샷 준비 상태로 돌아간다(이미 확정된 샷은 다시 판정하지 않음)
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && CHC.phase === 'swing') { cancelAnimationFrame(CHC.raf); CHC.phase = 'ready'; CHC.pose = 'idle'; if (view.name === 'chPlay') render(); }
+  });
+  function chSay(text, qi) { var v = document.getElementById('chVd'); if (!v) return; v.textContent = text; v.className = 'ch-vd q' + qi; void v.offsetWidth; v.classList.add('go'); }
+  function chImpact() {
+    cancelAnimationFrame(CHC.raf);
+    var C = chCfg(), S0 = CHC.S, p = Math.round(chPAt(performance.now()) * 10000) / 10000, no = CHC.st.n_shot, before = { i: CHC.st.i, s: CHC.st.s, lat: CHC.st.lat }, h = S0.holes[before.i], g = chGeomOf(h);
+    CHC.phase = 'fly'; CHC.pose = 'impact'; chPose();
+    var o = Engine.ch.shot(M, S0, CHC.st, p); if (o.error) { CHC.phase = 'ready'; return; }
+    CHC.st = o.st; CHC.hist[o.st.n_shot] = JSON.stringify(o.st);
+    CHC.unsent.push({ n: no, p: p }); chFlush(); var sv = document.getElementById('chSave'); if (sv) sv.textContent = '저장 중…';
+    var gf = document.getElementById('chGolfer'); if (gf) { gf.classList.remove('fx'); void gf.offsetWidth; gf.classList.add('fx'); }
+    chSay(C.qualName[o.evs[0].qi], o.evs[0].qi);
+    var steps = o.evs.map(function (e, k) { return { to: e.to, dur: k ? 300 : 800 }; });
+    setTimeout(function () { CHC.pose = 'finish'; chPose(); chFly(before, steps, o, g, h); }, 240); // 임팩트 → 피니시 자세, 공 이동
+  }
+  function chFly(from, steps, o, g, h) {
+    var k = 0, cur = { s: from.s, lat: from.lat }, t0 = performance.now(), seg = steps[0], a = { s: cur.s, lat: cur.lat };
+    var frame = function (t) {
+      var u = Math.min(1, (t - t0) / seg.dur), e = 1 - Math.pow(1 - u, 3), s = a.s + (seg.to.s - a.s) * e, lat = a.lat + (seg.to.lat - a.lat) * e, b = Engine.ch.xy(g, s, lat), el = document.getElementById('chBall');
+      if (el) { el.setAttribute('cx', b.x); el.setAttribute('cy', b.y); }
+      if (u < 1) { requestAnimationFrame(frame); return; }
+      k++; if (k < steps.length) { a = { s: seg.to.s, lat: seg.to.lat }; seg = steps[k]; t0 = performance.now(); requestAnimationFrame(frame); return; }
+      finish();
+    };
+    var done = false, finish = function () { if (done) return; done = true; chLand(o, from, g, h); };
+    setTimeout(finish, steps.reduce(function (sum, x) { return sum + x.dur; }, 0) + 250); // 화면이 가려져 프레임이 멈춰도 착지 처리는 이어서 진행
+    requestAnimationFrame(frame);
+  }
+  function chLand(o, from, g, h) {
+    var ev = o.evs[0], last = o.evs[o.evs.length - 1], b = Engine.ch.xy(g, ev.to.s, ev.to.lat);
+    (CHC.trails[from.i] = CHC.trails[from.i] || []).push([b.x, b.y]);
+    var d = chClone(o.st); if (o.hole_result) { d.i = from.i; d.s = last.to.s; d.lat = last.to.lat; d.strokes = o.hole_result.strokes; d.done = false; }
+    CHC.disp = d;
+    // 캐릭터 공격: 샷마다 보스 피격·피해 숫자·HP/SP 갱신(공격 연출이 게이지·버튼을 가리지 않게 상단 영역에서만)
+    var fx = document.getElementById('chFx'), boss = document.getElementById('chBoss'), rpg = document.getElementById('chRpg'), beam = document.getElementById('chBeam');
+    o.evs.forEach(function (e, i) { setTimeout(function () { spawnFloat(fx, '-' + fmtR(e.d), e.q === 'CRIT' ? 'crit' : e.q === 'STRONG' ? 'strong' : ''); }, i * 250); });
+    if (boss) { boss.classList.remove('hit'); void boss.offsetWidth; boss.classList.add('hit'); setTimeout(function () { boss.classList.remove('hit'); }, 500); }
+    if (rpg) { rpg.classList.add('atk'); setTimeout(function () { rpg.classList.remove('atk'); }, 520); }
+    if (beam) { beam.classList.remove('go'); void beam.offsetWidth; beam.classList.add('go'); }
+    var hp = document.getElementById('chHpBar'), ht = document.getElementById('chHpTxt'), sp = document.getElementById('chSpBar'), st2 = document.getElementById('chSpTxt');
+    if (hp) hp.style.width = Math.max(0, o.st.hp / CHC.S.boss_hp * 100) + '%'; if (ht) ht.textContent = 'HP ' + fmtR(Math.max(0, o.st.hp)) + ' / ' + fmt(CHC.S.boss_hp);
+    if (sp) sp.style.width = Math.min(100, o.st.sp) + '%'; if (st2) st2.textContent = 'SP ' + Math.round(o.st.sp) + '/100 · 자동 사용';
+    if (o.evs.some(function (e) { return e.sp_auto; })) toast('특수공격 준비! 홀 종료 때 자동으로 써요');
+    if (o.hole_result) setTimeout(function () { spawnFloat(fx, '홀 종료 -' + fmtR(o.hole_result.E), 'finish'); if (hp) hp.style.width = Math.max(0, o.st.hp / CHC.S.boss_hp * 100) + '%'; }, 650);
+    setTimeout(function () {
+      CHC.pose = 'idle';
+      if (o.hole_result) { CHC.holeEnd = o.hole_result; CHC.phase = 'holeend'; render(); return; }
+      if (CHC.practice && CHC.st.n_shot >= 3) { chPracticeEnd(); return; }
+      CHC.phase = 'ready'; if (view.name === 'chPlay') render(); // 클럽·남은 거리·카메라(그린 확대) 갱신
+    }, o.hole_result ? 900 : 380);
+  }
+  A.chNext = function () {
+    if (CHC.practice) { chPracticeEnd(); return; }
+    if (CHC.st.done) { CHC.holeEnd = null; CHC.phase = 'ready'; go('chResult'); return; }
+    CHC.holeEnd = null; CHC.phase = 'ready'; CHC.pose = 'idle'; CHC.disp = chClone(CHC.st); render();
+  };
+  A.chExit = function () {
+    popup = { type: 'confirm', title: CHC.practice ? '연습을 그만할까요?' : '원정에서 나갈까요?', text: CHC.practice ? '연습은 횟수·보상에 영향이 없어요. 언제든 다시 할 수 있어요.' : '지금까지 친 샷은 저장돼요. 나중에 이어서 할 수 있어요.', yes: '나가기', no: '계속하기', run: function () { cancelAnimationFrame(CHC.raf); CHC.phase = 'ready'; if (CHC.practice) chPracticeLeave(); go('dungeon'); } }; render();
+  };
+  // ---- 서버 저장(뒤에서 차례로). 연결이 끊기면 다음 샷을 막고 재시도를 안내 ----
+  function chFlush() {
+    if (CHC.practice) { CHC.unsent = []; return; } // 연습: 서버 저장 없음
+    if (CHC.flushing || !CHC.unsent.length || !CHC.r) return;
+    CHC.flushing = true;
+    var it = CHC.unsent[0];
+    Api.call('challengeShot', { round_id: CHC.r.round_id, shot_no: it.n, p: it.p }, { read: true }).then(function (res) {
+      CHC.flushing = false;
+      var sv = document.getElementById('chSave');
+      if (!res.ok) {
+        var c = res.error.code;
+        if (c === 'NETWORK' || c === 'SERVER_ERROR' || c === 'BUSY') { CHC.syncErr = true; if (view.name === 'chPlay' && CHC.phase === 'ready') render(); else if (sv) { sv.textContent = '저장 실패'; sv.className = 'save err'; } return; }
+        if (c === 'SESSION_EXPIRED') return;
+        if (res.error.round) { toast('서버 기준으로 맞췄어요'); chAdopt(res.error.round); go(res.error.round.status === 'ACTIVE' ? 'chPlay' : 'chResult'); return; }
+        toast(res.error.message); CHC.unsent = []; return;
+      }
+      CHC.unsent.shift(); CHC.syncErr = false;
+      var rd = res.data.round, n = rd.state.n_shot;
+      if (CHC.hist[n] && CHC.hist[n] !== JSON.stringify(rd.state)) { // 서버 값이 기준
+        if (window.console) console.warn('challenge state mismatch at shot ' + n);
+        if (!CHC.unsent.length && CHC.phase === 'ready') { chAdopt(rd); if (view.name === 'chPlay') render(); return; }
+      }
+      if (rd.status !== 'ACTIVE' || rd.reward) { CHC.r = rd; S.challenge = { round_id: rd.round_id, status: rd.status }; }
+      else CHC.r = Object.assign({}, CHC.r, { state: rd.state });
+      if (sv && !CHC.unsent.length) { sv.textContent = '저장됨'; sv.className = 'save'; }
+      if (CHC.unsent.length) chFlush(); else if (view.name === 'chResult') render();
+    });
+  }
+  A.chRetry = function () { CHC.syncErr = false; if (view.name === 'chPlay') render(); chFlush(); };
+  // 숨김 기능 계정(회원DB '숨김 기능' = Y)만: 우측 상단 3연속 터치 → 남은 샷을 모두 완벽한 샷으로 확정(시연용). 서버에서도 검사
+  A.chHidden = function () {
+    var t = Date.now(); CHC.taps = CHC.taps.filter(function (x) { return t - x < 1500; }); CHC.taps.push(t);
+    if (CHC.taps.length < 3) return; CHC.taps = [];
+    if (CHC.practice || (CHC.phase !== 'ready' && CHC.phase !== 'holeend')) return;
+    if (CHC.unsent.length || CHC.flushing) { toast('저장 중이에요. 잠시 뒤 다시 눌러 주세요'); return; }
+    Api.call('challengeAuto', { round_id: CHC.r.round_id }).then(function (res) {
+      if (!res.ok) { toast(res.error.message); return; }
+      chAdopt(res.data.round); go('chResult');
+    });
+  };
+  // ---- 결과·재료 선택 ----
+  function chProbText() {
+    var C = chCfg(), T = CHC.S ? CHC.S.tier : 1;
+    return '<div class="card"><b>확률 안내</b><p class="small">보상 등급(' + GRADE_NAME[1] + '~' + GRADE_NAME[5] + ')에 따라 선택 재료 수량이 정해져요: ' + C.matQty.join('·') + '개. 선택 재료 단계는 목표 단계 ' + T + '단계 70% / 한 단계 아래 30%(1단계는 100%)예요.</p>' +
+      '<p class="small">특수 재료는 4번째 후보로 라운드당 최대 1종·1개가 나올 수 있고, 후보 중 1개만 받아요. 단계 조건(파편 3단계 이상 · 결정 4단계 이상 · 핵 5단계)을 채워야 나와요.</p>' +
+      '<p class="small">후보 등장 확률(일반/고급/희귀/영웅/전설) 파편 ' + C.special.map(function (x) { return (x[0] * 100).toFixed(2).replace(/\.?0+$/, ''); }).join('/') + '% · 결정 ' + C.special.map(function (x) { return (x[1] * 100).toFixed(2).replace(/\.?0+$/, '') || '0'; }).join('/') + '% · 핵 ' + C.special.map(function (x) { return (x[2] * 100).toFixed(2).replace(/\.?0+$/, '') || '0'; }).join('/') + '%</p></div>';
+  }
+  SCREENS.chResult = function () {
+    var S0 = CHC.S, st = CHC.st; if (!S0 || !st || !st.done) return SCREENS.dungeon();
+    var res = (CHC.r && CHC.r.result) || Engine.ch.result(M, S0, st), rw = CHC.r && CHC.r.reward, sel = CHC.r && CHC.r.selected, boss = IX.boss[S0.boss_id], g = res.grade;
+    var rows = st.holes.map(function (x) { return '<div class="crow"><b class="rno hn">' + x.hole + 'H</b><span style="flex:1">PAR ' + x.par + ' · ' + x.strokes + '타 <b class="hr ' + x.result_key + '">' + esc(x.result) + '</b></span><span class="small">피해 ' + fmt(Math.round(x.damage)) + '</span></div>'; }).join('');
+    var sc = res.diff === 0 ? '이븐파' : (res.diff > 0 ? '+' : '') + res.diff;
+    var cands = '';
+    if (!rw) cands = '<div class="card"><p class="sub">' + (CHC.syncErr ? '저장이 끊겼어요. 연결을 확인하고 다시 시도해 주세요.' : '보상을 확인하고 있어요…') + '</p>' + (CHC.syncErr ? '<button class="btn ghost" data-a="chRetry">다시 시도</button>' : '') + '</div>';
+    else {
+      cands = '<div class="card g' + g + '" style="border:2px solid var(--gc)"><b class="gname" style="font-size:18px">원정 결과 ' + esc(res.grade_name) + '</b><p class="sub">선택 재료 ' + rw.tier + '단계 · ' + (sel ? '받은 재료는 아래와 같아요' : '아래에서 1개를 선택하세요') + '</p>' +
+        '<p class="small">' + (res.capped ? '피해 비율로는 ' + esc(res.grade_by_ratio) + '이지만 난이도 ' + res.zone + ' 구간 최고 등급이 적용됐어요' : '피해 비율 ' + Math.round(res.ratio * 100) + '%로 결정') + '</p>' +
+        '<div class="chcands' + (rw.candidates.length > 3 ? ' n4' : '') + '">' + rw.candidates.map(function (c) {
+          var m = IX.material[c.material_id], on = sel === c.key;
+          return '<button class="chcand' + (c.special ? ' sp' : '') + (on ? ' on' : '') + '" data-a="chPick" data-key="' + c.key + '"' + (sel ? ' disabled' : '') + '>' + matIcon(c.material_id) + '<b>' + esc(m ? m.name : c.material_id) + '</b><span>×' + c.qty + (c.special ? ' · 특수' : '') + '</span></button>';
+        }).join('') + '</div>' + (sel ? '' : '<p class="small">특수 재료를 고르면 이번 기본 재료는 받지 않아요. 선택은 한 번만 할 수 있어요.</p>') + '</div>';
+    }
+    return dgScreen('<b style="font-size:20px">3홀 챌린지 결과</b>' +
+      '<div class="card"><div class="row"><b style="color:' + (res.killed_at ? 'var(--ok)' : 'var(--bad)') + '">' + (res.killed_at ? '보스 처치 · ' + res.killed_at + 'H' : '보스 생존') + '</b><span>' + esc(boss.name) + '</span></div>' +
+      '<p class="sub">합계 ' + res.strokes + '타 (PAR ' + res.par + ' · ' + sc + ') · 피해 ' + fmt(res.total_damage) + ' · 피해 비율 ' + Math.round(res.ratio * 100) + '%</p>' +
+      '<div class="small">' + esc(S0.course_name) + ' · ' + S0.start_hole + '~' + (S0.start_hole + 2) + 'H</div>' + rows + '</div>' + cands +
+      '<button class="small" data-a="chProbs" style="padding:8px">확률 보기</button>' +
+      (sel ? '<button class="btn gold" data-a="chDone">던전으로</button>' : '') + '<button class="btn ghost" data-a="chLink">GS 레이드 소개 보기</button>');
+  };
+  A.chPick = function (d) {
+    if (CHC.busyPick || !CHC.r || CHC.r.selected) return; CHC.busyPick = true;
+    var key = d.key, c = CHC.r.reward.candidates.filter(function (x) { return x.key === key; })[0];
+    act('challengeChooseReward', { round_id: CHC.r.round_id, key: key }).then(function (res) {
+      CHC.busyPick = false;
+      if (!res.ok) { toast(res.error.message); if (res.error.round) { CHC.r = res.error.round; render(); } return; }
+      CHC.r = res.data.round; S.materials = res.data.materials; S.wallet = res.data.wallet; S.challenge = null;
+      var m = IX.material[c.material_id]; toast((m ? m.name : '재료') + ' ' + c.qty + '개를 받았어요'); render();
+    });
+  };
+  POPUPS.chProbs = function () { return '<div class="overlay center"><div class="sheet"><b style="font-size:18px">3홀 챌린지 확률 안내</b>' + chProbText() + '<button class="btn ghost" data-a="close">닫기</button></div></div>'; };
+  A.chProbs = function () { popup = { type: 'chProbs' }; render(); };
+  A.chDone = function () { go('dungeon'); };
+  A.chLink = function () { go('dungeon'); toast('던전 탭의 [스크린 라운드로 시작]에서 GS 레이드를 볼 수 있어요'); };
+
+  /* ================= 새로고침해도 보던 화면 유지(30분) =================
+   * 위로 당겨 새로고침하거나 앱을 다시 열어도 골프존앱 메인으로 돌아가지 않고 마지막 게임 화면(탭·스크롤)으로 이어진다.
+   * 저장은 이 기기에만(localStorage): 화면 이름·단순 값 파라미터·스크롤. 팝업·레이드 진행·3홀 챌린지는 서버 상태로 이어 하므로 화면 이름만 기억 */
+  var VK0 = null; try { VK0 = JSON.parse(localStorage.getItem('rf_view') || 'null'); } catch (e) {} // 처음 열 때의 값(메인 화면으로 가는 순간 지워지기 전에 읽어 둠)
+  var VKEEP = { map: 1, courses: 1, craft: 1, items: 1, char: 1, rank: 1, dungeon: 1, hunt: 1, chIntro: 1, chReady: 1, chPlay: 1, chResult: 1 }, VKEEP_MS = 30 * 60000, vkTimer = 0;
+  function vkSave(name, p) {
+    try {
+      if (!S || !S.member) return;
+      if (VKEEP[name]) {
+        var q = {}; Object.keys(p || {}).forEach(function (k) { var v = p[k]; if (v === null || ['string', 'number', 'boolean'].indexOf(typeof v) >= 0) q[k] = v; });
+        localStorage.setItem('rf_view', JSON.stringify({ u: S.member.member_id, n: name, p: q, at: Date.now(), sc: 0 }));
+      } else if (name === 'launcher' || name === 'login' || name === 'intro' || name === 'jobSelect') localStorage.removeItem('rf_view');
+    } catch (e) {}
+  }
+  var _goKeep = go;
+  go = function (name, p) { _goKeep(name, p); vkSave(name, p); };
+  root.addEventListener('scroll', function (e) {
+    if (!e.target.classList || !e.target.classList.contains('scroll') || vkTimer) return;
+    vkTimer = setTimeout(function () { vkTimer = 0; try { var v = JSON.parse(localStorage.getItem('rf_view') || 'null'), sc = root.querySelector('.scroll'); if (v && sc && VKEEP[view.name]) { v.sc = Math.round(sc.scrollTop); v.at = Date.now(); localStorage.setItem('rf_view', JSON.stringify(v)); } } catch (x) {} }, 400);
+  }, true);
+  function vkRestore() {
+    try {
+      var v = VK0; VK0 = null;
+      if (!v || !S || !S.member || v.u !== S.member.member_id || Date.now() - v.at > VKEEP_MS || S.member.intro_seen !== 'Y' || needJob()) return false;
+      var n = v.n;
+      if (/^ch[A-Z]/.test(n)) { if (S.challenge) A.chOpen(); else go(n === 'chIntro' ? 'chIntro' : 'dungeon'); return true; }
+      if (n === 'hunt' && !S.hunt) n = 'map';
+      if (n === 'rank') { A.rank(); return true; }
+      go(n, v.p || {});
+      if (v.sc) setTimeout(function () { var sc = root.querySelector('.scroll'); if (sc) sc.scrollTop = v.sc; }, 80);
+      return true;
+    } catch (e) { return false; }
+  }
+
   // ---------------- 시작 ----------------
   // 서버 깨우기(첫 요청 지연 줄임) + 기준 데이터와 저장 데이터를 동시에 받기(v0.5 최적화)
   Api.warm();
@@ -2537,7 +2969,7 @@
     M = m; IX = Engine.index(M);
     if (!saveP) { go('login'); return; }
     saveP.then(function (res) {
-      if (res.ok) { Api.state.version = res.save_version; setSave(res.data); go('launcher'); dgRestore(); preloadLooks(); setTimeout(function () { missionRefresh(true); rankRefresh(1); }, 300); } else { popup = null; Api.logout(); go('login'); }
+      if (res.ok) { Api.state.version = res.save_version; setSave(res.data); go('launcher'); vkRestore(); dgRestore(); preloadLooks(); setTimeout(function () { missionRefresh(true); rankRefresh(1); }, 300); } else { popup = null; Api.logout(); go('login'); }
     });
   }, function () { root.innerHTML = '<div class="screen" style="padding:24px"><p>기준 데이터를 불러오지 못했어요. 새로고침해 주세요.</p></div>'; });
 })();

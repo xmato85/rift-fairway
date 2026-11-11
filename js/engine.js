@@ -670,6 +670,233 @@ var Engine = (function () {
     return { grade: gradeNo, gold: gold, materials: mats, special: special, items: items, target_grade: tg, v: 10 };
   }
 
+  // ---------- v1.1 3홀 챌린지: 유저 임팩트 입력으로만 진행하는 모드(DAILY_3HOLE) ----------
+  // 실제 GS 레이드의 시간 기반 자동치기와 분리한다. 입력(p) 하나가 샷 1개를 확정한다.
+  // 게임용 가상 샷·스코어이며 실제 GS 샷·핸디캡 기록과 섞지 않는다.
+  var CHW = 300;                                  // 지도 좌표 단위: x = 0~300, y = 0~300×aspect(이미지 높이/너비)
+  var CH_GREEN_MIN = 20, CH_GREEN_MAX = 32;       // 그린 반경(m) 허용 범위: 이미지의 그린 원 크기를 실제 홀 거리 기준 미터로 바꾼 값을 이 범위로 제한
+  // 16종 레이아웃: GPT가 그린 지도 이미지(ch_map_{id}.webp)에서 tools/trace_layouts.js로 추출한 메타데이터
+  //  pts = 티 → 홀컵 중심 경로(이미지 크기 기준 0~1), ws = 각 점의 페어웨이 폭(300 단위), gr = 그린 반경(300 단위)
+  var CH_LAYOUTS = [
+    { id: "P3_01", par: 3, name: "짧은 직선형", aspect: 1.4055, gr: 32.9,
+      pts: [[0.4975,0.863],[0.4995,0.8043],[0.495,0.7454],[0.495,0.6864],[0.495,0.6273],[0.495,0.5682],[0.495,0.5092],[0.495,0.4501],[0.495,0.391],[0.4953,0.332],[0.4969,0.2729]],
+      ws: [43.2,48,60,60,60,60,60,60,60,57.7,57.7] },
+    { id: "P3_02", par: 3, name: "좌측 사선형", aspect: 1.2, gr: 34.5,
+      pts: [[0.675,0.8625],[0.6612,0.7936],[0.6039,0.7402],[0.5647,0.6765],[0.5261,0.6124],[0.4869,0.5486],[0.4472,0.485],[0.4089,0.4209],[0.368,0.3578],[0.3306,0.2932]],
+      ws: [44.730000000000004,49.7,59.4,59.4,59.4,59.4,59.4,59.4,55.7,55.7] },
+    { id: "P3_03", par: 3, name: "우측 사선형", aspect: 1.2, gr: 34.6,
+      pts: [[0.3175,0.8625],[0.3301,0.7936],[0.3812,0.7374],[0.4212,0.6748],[0.46,0.6117],[0.4999,0.5491],[0.5395,0.4863],[0.5796,0.4237],[0.6198,0.3613],[0.6573,0.2976]],
+      ws: [48.6,54,61.1,59.4,59.4,59.4,59.4,59.4,54.2,54.2] },
+    { id: "P3_04", par: 3, name: "완만한 좌측 곡선형", aspect: 1.2, gr: 34.7,
+      pts: [[0.6175,0.8396],[0.6065,0.7688],[0.5623,0.7058],[0.5284,0.6376],[0.4861,0.5732],[0.4274,0.5178],[0.405,0.4492],[0.407,0.3754],[0.4161,0.3019]],
+      ws: [45.9,51,60.7,60,58.1,59.4,60,54.2,54.2] },
+    { id: "P3_05", par: 3, name: "완만한 우측 곡선형", aspect: 1.2, gr: 34.2,
+      pts: [[0.3775,0.8625],[0.3859,0.7953],[0.4283,0.7375],[0.4577,0.6738],[0.4897,0.611],[0.5405,0.5579],[0.587,0.5028],[0.59,0.4347],[0.585,0.3667],[0.5738,0.299]],
+      ws: [45.9,51,61.2,61.2,60.4,58.1,61.7,57,53.7,53.7] },
+    { id: "P4_01", par: 4, name: "직선형", aspect: 1.2, gr: 18.4,
+      pts: [[0.4975,0.8792],[0.5,0.8051],[0.5,0.7307],[0.5,0.6564],[0.495,0.5822],[0.495,0.5079],[0.495,0.4335],[0.495,0.3592],[0.495,0.2848],[0.495,0.2104],[0.4972,0.1361]],
+      ws: [48.6,54,54,54,51,51,54,54,54,54,54] },
+    { id: "P4_02", par: 4, name: "좌측 도그레그형", aspect: 1.4055, gr: 22.7,
+      pts: [[0.6002,0.8751],[0.6,0.8135],[0.6,0.752],[0.6,0.6905],[0.6,0.629],[0.6,0.5674],[0.595,0.5061],[0.5695,0.4478],[0.5205,0.3972],[0.4634,0.351],[0.4074,0.3042],[0.3574,0.2543],[0.3333,0.1957],[0.3321,0.1342]],
+      ws: [45.9,51,51,51,51,51,56,57.4,56.9,55.1,56.9,59.7,59,59] },
+    { id: "P4_03", par: 4, name: "우측 도그레그형", aspect: 1.2, gr: 20.1,
+      pts: [[0.3975,0.8792],[0.3964,0.806],[0.395,0.7325],[0.395,0.6589],[0.395,0.5853],[0.4081,0.513],[0.4516,0.4495],[0.5109,0.3951],[0.5705,0.3407],[0.6232,0.2818],[0.6522,0.2126],[0.6553,0.1392]],
+      ws: [45.9,51,51,51,51,54,52.7,50.9,50.9,54.4,53.5,53.5] },
+    { id: "P4_04", par: 4, name: "완만한 S자형", aspect: 1.4055, gr: 24.1,
+      pts: [[0.4929,0.8737],[0.471,0.8192],[0.4115,0.7769],[0.375,0.7246],[0.375,0.6646],[0.3946,0.6074],[0.436,0.5553],[0.4781,0.5035],[0.5199,0.4515],[0.5646,0.4007],[0.6021,0.3473],[0.605,0.2875],[0.5889,0.23],[0.5385,0.1821],[0.4842,0.1363]],
+      ws: [40.5,45,58.1,59.5,59.5,61.1,59.4,61.1,59.4,59.4,62.4,60,61.1,59.4,59.4] },
+    { id: "P4_05", par: 4, name: "넓은 전반부·좁은 후반부형", aspect: 1.4055, gr: 22,
+      pts: [[0.4975,0.8808],[0.5,0.8192],[0.4966,0.7575],[0.495,0.6956],[0.495,0.6337],[0.495,0.5718],[0.495,0.5099],[0.495,0.4479],[0.495,0.386],[0.495,0.3241],[0.495,0.2622],[0.495,0.2003],[0.4961,0.1384]],
+      ws: [45.9,51,96,90,87,80.5,75,70.2,66,60,56.5,51,51] },
+    { id: "P5_01", par: 5, name: "긴 직선형", aspect: 1.4055, gr: 20.8,
+      pts: [[0.4975,0.8915],[0.5,0.832],[0.5,0.7722],[0.5,0.7124],[0.5,0.6526],[0.5,0.5928],[0.5,0.533],[0.5,0.4732],[0.5,0.4134],[0.5,0.3536],[0.5,0.2938],[0.5,0.234],[0.4989,0.1742],[0.4962,0.1145]],
+      ws: [43.2,48,54,54,54,54,54,54,54,54,54,54,54,54] },
+    { id: "P5_02", par: 5, name: "긴 좌측 도그레그형", aspect: 1.4055, gr: 19.6,
+      pts: [[0.655,0.9128],[0.655,0.8532],[0.655,0.7936],[0.655,0.7339],[0.655,0.6743],[0.655,0.6147],[0.6528,0.5551],[0.6324,0.4977],[0.5769,0.4533],[0.5176,0.4111],[0.4558,0.3709],[0.3943,0.3305],[0.3386,0.2862],[0.3028,0.2325],[0.29,0.1739],[0.2889,0.1143]],
+      ws: [43.2,48,48,48,48,48,50.5,55.5,53.9,53.9,53.9,53.9,55.1,56,54,54] },
+    { id: "P5_03", par: 5, name: "긴 우측 도그레그형", aspect: 1.2, gr: 15.4,
+      pts: [[0.34,0.925],[0.3389,0.8542],[0.335,0.7836],[0.33,0.713],[0.33,0.6421],[0.3397,0.572],[0.3811,0.5116],[0.4412,0.4615],[0.5047,0.4146],[0.5685,0.3679],[0.6286,0.3178],[0.6723,0.2581],[0.69,0.1893],[0.6926,0.1186]],
+      ws: [37.800000000000004,42,48,48,48,49.5,49.7,46.7,46.7,47.2,46.7,48,45,45] },
+    { id: "P5_04", par: 5, name: "긴 S자형", aspect: 1.2, gr: 17.6,
+      pts: [[0.495,0.9083],[0.4483,0.8519],[0.3841,0.8026],[0.37,0.7325],[0.4051,0.6672],[0.4609,0.611],[0.5132,0.5525],[0.5706,0.4973],[0.6142,0.4351],[0.6138,0.3622],[0.564,0.3033],[0.5057,0.2489],[0.4709,0.1827],[0.4558,0.1108]],
+      ws: [34.38,38.2,46.7,48.2,46.7,49.7,49.7,49.7,51,50,46.7,49.7,49.2,49.2] },
+    { id: "P5_05", par: 5, name: "두 번 완만하게 꺾이는 형", aspect: 1.4055, gr: 20.2,
+      pts: [[0.2545,0.9112],[0.2493,0.8518],[0.24,0.7925],[0.2423,0.7327],[0.268,0.6759],[0.3131,0.6255],[0.3668,0.5795],[0.4258,0.5368],[0.4862,0.4951],[0.5525,0.4583],[0.6183,0.4212],[0.6778,0.3788],[0.715,0.3271],[0.715,0.2672],[0.6776,0.2154],[0.6175,0.1736],[0.5502,0.1377],[0.4825,0.1022]],
+      ws: [43.2,48,48,48,50.9,50.9,50.9,53.9,53.9,55.1,55.1,55.1,55.5,55.5,53.9,53.9,53.9,53.9] },
+    { id: "P6_01", par: 6, name: "초장거리 확장 S자형", aspect: 1.4055, gr: 22.5,
+      pts: [[0.4971,0.9305],[0.4539,0.8811],[0.3721,0.8625],[0.3142,0.8163],[0.3232,0.7566],[0.3853,0.7128],[0.4563,0.6763],[0.5261,0.6388],[0.5954,0.6008],[0.6545,0.5551],[0.654,0.4941],[0.5949,0.4484],[0.5254,0.4106],[0.4525,0.376],[0.3819,0.3394],[0.3223,0.294],[0.3242,0.2339],[0.3848,0.1891],[0.4564,0.1534],[0.5181,0.1094]],
+      ws: [31.95,35.5,49.7,47.7,49.7,50.9,50.9,50.9,51.4,50.9,50.2,50.9,50.9,50.9,50.9,50.9,49.7,50.9,50.9,50.9] }
+  ];
+  // 초기안 수치(기획 제안 v0.2). master.challenge가 있으면 그 값이 우선
+  var CH_DEF = {
+    basicPerDay: 2, ticketMax: 10, // 하루 기본 이용 횟수(한국 시간 00:00 초기화·이월 없음), 누적 이용권 보관 한도
+    holes: 3, startHoles: [1, 4, 7, 10, 13, 16], tee: { M: 'White', F: 'Red' },
+    greenM: 25, aimShort: 8, driverMin: 220, club: { DRIVER: 240, IRON: 160 },
+    reach: [1, 0.95, 0.75, 0.55], cut: [0.12, 0.40, 0.75], angleDeg: 12,
+    puttIn: [10, 5, 2, 1], puttLeft: [0.10, 0.20, 0.45, 0.65], latPad: 17, maxMult: 2,
+    qual: ['CRIT', 'STRONG', 'NORMAL', 'NORMAL'], qualName: ['완벽한 샷', '좋은 샷', '무난한 샷', '빗맞은 샷'], qualKey: ['NICE SHOT', 'GOOD', 'NOT BAD', 'BAD'],
+    holeMult: { eagle: 1.5, birdie: 1.2, par: 1, bogey: 0.8, double: 0.6, triple: 0.4, quad: 0.2, cap: 0.1 },
+    hpExtra: 1.15, hpSolo: 0.9, concede: [1, 0.5],
+    matQty: [1, 1, 2, 2, 3], tierKeep: 0.7,
+    special: [[0.002, 0, 0], [0.004, 0, 0], [0.008, 0.001, 0], [0.012, 0.002, 0.0003], [0.02, 0.005, 0.001]], // 등급별 [파편, 결정, 핵]
+    specialNeed: [3, 4, 5], specialIds: ['MAT-RIFT-3', 'MAT-RIFT-4', 'MAT-RIFT-5'], families: ['IRON', 'LEATHER', 'CLOTH']
+  };
+  function chCfg(M) { var o = {}, c = M.challenge || {}; Object.keys(CH_DEF).forEach(function (k) { o[k] = c[k] !== undefined ? c[k] : CH_DEF[k]; }); return o; }
+  function chLayout(id) { return CH_LAYOUTS.filter(function (l) { return l.id === id; })[0]; }
+  var CH_GEOM = {};
+  /** 레이아웃 중심 경로(Catmull-Rom 촘촘한 점 목록·누적 길이·점별 폭) */
+  function chBase(id) {
+    if (CH_GEOM[id]) return CH_GEOM[id];
+    var l = chLayout(id), HH = CHW * l.aspect, P = l.pts.map(function (a) { return [a[0] * CHW, a[1] * HH]; }), n = P.length, D = [], WD = [], i, k, t;
+    for (i = 0; i < n - 1; i++) {
+      var p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(n - 1, i + 2)];
+      for (k = 0; k < 16; k++) {
+        t = k / 16; var t2 = t * t, t3 = t2 * t;
+        D.push([0, 1].map(function (a) { return 0.5 * ((2 * p1[a]) + (-p0[a] + p2[a]) * t + (2 * p0[a] - 5 * p1[a] + 4 * p2[a] - p3[a]) * t2 + (-p0[a] + 3 * p1[a] - 3 * p2[a] + p3[a]) * t3); }));
+        WD.push(l.ws[i] + (l.ws[i + 1] - l.ws[i]) * t);
+      }
+    }
+    D.push(P[n - 1]); WD.push(l.ws[n - 1]);
+    var cum = [0]; for (i = 1; i < D.length; i++) cum.push(cum[i - 1] + Math.hypot(D[i][0] - D[i - 1][0], D[i][1] - D[i - 1][1]));
+    return (CH_GEOM[id] = { layout: l, D: D, cum: cum, wd: WD, len: cum[cum.length - 1], H: HH });
+  }
+  /** 실제 홀 거리(m)에 맞춰 경로 길이를 스케일링: scale = 경로 단위/미터. 거리는 이미지·경로에 고정하지 않는다 */
+  function chGeom(id, distM) {
+    var b = chBase(id), scale = b.len / distM, gr = b.layout.gr || 25 * scale;
+    return { layout: b.layout, D: b.D, cum: b.cum, wd: b.wd, len: b.len, H: b.H, dist: distM, scale: scale, greenM: Math.max(CH_GREEN_MIN, Math.min(CH_GREEN_MAX, gr / scale)) };
+  }
+  function chPos(g, s) {
+    s = Math.max(0, Math.min(g.len, s));
+    var i = 1; while (i < g.D.length - 1 && g.cum[i] < s) i++;
+    var a = g.D[i - 1], b = g.D[i], seg = (g.cum[i] - g.cum[i - 1]) || 1, t = (s - g.cum[i - 1]) / seg, dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1;
+    return { x: a[0] + dx * t, y: a[1] + dy * t, tx: dx / d, ty: dy / d };
+  }
+  /** 경로상 진행 위치 s + 횡방향 lat(진행 방향 왼쪽이 +) → 지도 좌표 */
+  function chXY(g, s, lat) { var p = chPos(g, s); return { x: p.x + p.ty * lat, y: p.y - p.tx * lat }; }
+  function chWidthAt(g, s) {
+    s = Math.max(0, Math.min(g.len, s)); var i = 1; while (i < g.D.length - 1 && g.cum[i] < s) i++;
+    var seg = (g.cum[i] - g.cum[i - 1]) || 1, t = (s - g.cum[i - 1]) / seg; return g.wd[i - 1] + (g.wd[i] - g.wd[i - 1]) * t;
+  }
+  function chRemain(g, st) { return Math.hypot(g.len - st.s, st.lat) / g.scale; }
+  function chJudge(C, p) { var e = Math.abs(2 * p - 1); return e <= C.cut[0] ? 0 : e <= C.cut[1] ? 1 : e <= C.cut[2] ? 2 : 3; }
+  function chClub(C, par, shotNo, rem, gm) { return rem <= (gm || C.greenM) ? 'PUTTER' : (shotNo === 0 && par >= 4 && rem > C.driverMin) ? 'DRIVER' : 'IRON'; }
+  function chR3(x) { return Math.round(x * 1000) / 1000; }
+  /** 같은 PAR 풀에서 홀마다 추첨: 한 라운드 안 비복원, 직전 라운드의 같은 PAR 마지막 레이아웃은 첫 추첨에서 제외 */
+  function chPickLayouts(r, pars, prevByPar) {
+    var used = {}, seen = {}, out = [];
+    pars.forEach(function (par) {
+      var pool = CH_LAYOUTS.filter(function (l) { return l.par === par; }), left = pool.filter(function (l) { return !used[l.id]; });
+      if (left.length) pool = left;
+      if (!seen[par] && prevByPar && prevByPar[par] && pool.length > 1) pool = pool.filter(function (l) { return l.id !== prevByPar[par]; });
+      seen[par] = 1;
+      var pick = pool[Math.floor(r() * pool.length)]; used[pick.id] = 1; out.push(pick.id);
+    });
+    return out;
+  }
+  /** 챌린지 시작 확정: 코스·시작 홀·3홀(PAR·거리·지도)·설정·보스를 시드로 고정(재추첨 없음).
+   *  o = { seed, gender('M'|'F'), jobId, cp, tier(재료 목표 단계), prevByPar?, courseId?, startHole? } */
+  function chSetup(M, o) {
+    var C = chCfg(M), ix = index(M), r = rng('chs:' + o.seed), tee = o.gender === 'F' ? C.tee.F : C.tee.M;
+    var sh = o.startHole || C.startHoles[Math.floor(r() * C.startHoles.length)];
+    var okHole = function (c, h) { var par = c.par[h - 1], d = c.tees && c.tees[tee] && c.tees[tee][h - 1]; return par >= 3 && par <= 6 && d > 0; };
+    var cands = M.raidCourses.filter(function (c) { for (var k = 0; k < C.holes; k++) if (!okHole(c, sh + k)) return false; return true; });
+    var course = o.courseId ? ix.raidCourse[o.courseId] : pickWeighted(r, cands, function (c) { return c.weight || 1; });
+    var pars = [], dists = [];
+    for (var k = 0; k < C.holes; k++) { pars.push(course.par[sh + k - 1]); dists.push(course.tees[tee][sh + k - 1]); }
+    var lays = chPickLayouts(r, pars, o.prevByPar);
+    var room = {}, mode = pickWeighted(r, M.settingOptions.filter(function (x) { return x.scope === 'ROOM' && x.item === '게임방식'; }), function (x) { return x.weight; });
+    room['게임방식'] = mode.option;
+    var con = pickWeighted(r, M.settingOptions.filter(function (x) { return x.scope === 'PERSONAL' && x.item === '컨시드' && C.concede.some(function (m) { return x.option.indexOf(m + 'm') === 0; }); }), function (x) { return x.weight; });
+    var concedeM = parseFloat(con.option);
+    room['컨시드'] = con.option; room['티'] = tee; room['멀리건'] = '0회';
+    var teeKey = '티 위치(' + (o.gender === 'F' ? '여' : '남') + ')|' + tee;
+    var courseScore = (course.courseDiff + course.greenDiff) * M.raidConst.diffScoreMult;
+    var diffScore = Math.round((courseScore + mode.score + con.score + settingScore(M, teeKey)) * 10) / 10;
+    var zone = zoneOf(M, diffScore), boss = ix.boss[ix.region[course.regionId].bossId], B = baseDamage(M, o.jobId, Number(o.cp));
+    var hp = Math.round(B * C.holes * C.hpExtra * zone.hpCoef * C.hpSolo);
+    return { v: 1, seed: o.seed, gender: o.gender === 'F' ? 'F' : 'M', job_id: o.jobId, cp: Number(o.cp), top_skill_id: topSkill(M, o.jobId, Number(o.cp)).id,
+      base_damage: B, tier: o.tier, course_id: course.courseId, course_name: course.name, region_id: course.regionId, boss_id: boss.id,
+      tee: tee, start_hole: sh, concede_m: concedeM, settings: room, course_score: courseScore, diff_score: diffScore, zone: zone.zone, boss_hp: hp,
+      holes: pars.map(function (p, i) { return { hole: sh + i, par: p, dist: dists[i], layout_id: lays[i] }; }) };
+  }
+  function chStart(M, S) {
+    return { i: 0, n_shot: 0, strokes: 0, s: 0, lat: 0, hole_d: 0, hole_s: 0, carry: 0, sp: 0, sp_gain: 0, pend: 0, sp_uses: 0, damage: 0, shot_damage: 0, hole_damage: 0,
+      hp: S.boss_hp, killed_at: null, holes: [], log: [], done: false };
+  }
+  function chHoleRatio(C, strokes, par) {
+    if (strokes >= par * C.maxMult) return { ratio: C.holeMult.cap, name: '타수 상한', key: 'cap' };
+    var d = strokes - par, H = C.holeMult;
+    return d <= -2 ? { ratio: H.eagle, name: '이글 이하', key: 'eagle' } : d === -1 ? { ratio: H.birdie, name: '버디', key: 'birdie' } : d === 0 ? { ratio: H.par, name: '파', key: 'par' }
+      : d === 1 ? { ratio: H.bogey, name: '보기', key: 'bogey' } : d === 2 ? { ratio: H.double, name: '더블 보기', key: 'double' } : d === 3 ? { ratio: H.triple, name: '트리플 보기', key: 'triple' } : { ratio: H.quad, name: '쿼드러플 보기 이상', key: 'quad' };
+  }
+  /** 샷 1개 확정(순수 함수): 입력 p(0~1) → 새 상태 + 샷 이벤트(들) + 홀 종료 결과. 웹·서버가 같은 계산을 쓴다 */
+  function chShot(M, S, st0, p) {
+    var C = chCfg(M), rc = M.raidConst, st = JSON.parse(JSON.stringify(st0));
+    if (st.done) return { error: 'DONE' };
+    p = Math.round(Math.min(1, Math.max(0, Number(p))) * 10000) / 10000;
+    var h = S.holes[st.i], g = chGeom(h.layout_id, h.dist), qi = chJudge(C, p), rem = chRemain(g, st), club = chClub(C, h.par, st.strokes, rem, g.greenM), cap = h.par * C.maxMult;
+    var ang = (2 * p - 1) * C.angleDeg * Math.PI / 180, ev = { i: st.n_shot, hole: h.hole, seq: st.strokes + 1, club: club, p: p, qi: qi, q: C.qual[qi], from: { s: st.s, lat: st.lat } }, s1, lat1, holed = false;
+    if (club === 'PUTTER') {
+      if (rem <= C.puttIn[qi]) { holed = true; s1 = g.len; lat1 = 0; ev.dist = chR3(rem); }
+      else { var f = C.puttLeft[qi]; s1 = g.len - (g.len - st.s) * f; lat1 = st.lat * f; ev.dist = chR3(rem * (1 - f)); }
+    } else {
+      var tgt = Math.max(0, Math.min(C.club[club], rem - C.aimShort)), d = tgt * C.reach[qi];
+      s1 = Math.min(g.len, st.s + d * Math.cos(ang) * g.scale);
+      var lim = chWidthAt(g, s1) / 2 + C.latPad; lat1 = Math.max(-lim, Math.min(lim, st.lat - d * Math.sin(ang) * g.scale));
+      ev.dist = chR3(d);
+    }
+    st.s = chR3(s1); st.lat = chR3(lat1); st.strokes++; st.n_shot++; ev.to = { s: st.s, lat: st.lat };
+    var evs = [ev], rem2 = chRemain(g, st);
+    if (!holed && rem2 <= g.greenM && rem2 <= S.concede_m && st.strokes + 1 <= cap) { // 컨시드: 마지막 퍼트 1타 추가, 샷 이벤트 1회 기록
+      st.strokes++; st.n_shot++; holed = true;
+      evs.push({ i: st.n_shot - 1, hole: h.hole, seq: st.strokes, club: 'PUTTER', p: null, qi: 2, q: 'NORMAL', conceded: true, from: { s: st.s, lat: st.lat }, to: { s: g.len, lat: 0 }, dist: chR3(rem2) });
+      st.s = chR3(g.len); st.lat = 0;
+    }
+    var capped = !holed && st.strokes >= cap;
+    evs.forEach(function (e) { // 샷 공격 피해·SP (기존 레이드 규칙 재사용, 보스 스킬·파티 보너스 없음)
+      var Qn = e.q, Q = rc.shotQuality[Qn], B = S.base_damage;
+      var unit = rc.shotAlpha * B / h.par, capD = rc.shotCap * rc.shotAlpha * B, dm = unit * Q, room = Math.max(0, capD - st.hole_d), capd = false;
+      if (dm > room) { dm = room; capd = true; }
+      st.hole_d += dm; st.hole_s += dm / Q; st.shot_damage += dm; st.damage += dm; st.hp -= dm;
+      var gain = Math.max(0, Math.min(rc.spShotGain[Qn], rc.spHoleCap - st.sp_gain));
+      st.sp_gain += gain; st.sp = Math.min(M.sp.max, st.sp + gain);
+      if (st.sp >= M.sp.max && !st.pend) { st.pend = 1; st.sp = 0; st.sp_uses++; e.sp_auto = true; }
+      e.d = dm; e.sp_gain = gain; e.capped = capd;
+      if (st.hp <= 0 && st.killed_at === null) st.killed_at = h.hole;
+      st.log.push({ hole: h.hole, seq: e.seq, club: e.club, p: e.p, q: e.q });
+    });
+    var out = { st: st, evs: evs, holed: holed, capped: capped, club: club, hole_result: null, finished: false };
+    if (holed || capped) { // 홀 종료 정산: T = 기준 데미지 × 결과 비율 × SP 배율
+      var hr = chHoleRatio(C, st.strokes, h.par), m = 1, used = false;
+      if (st.pend) { m = spMult(M, rng('chsp:' + S.seed + ':' + h.hole)); st.pend = 0; used = true; }
+      var T = S.base_damage * hr.ratio * m, E = Math.max(0, T - st.hole_s - st.carry), carryOut = Math.max(0, st.hole_s + st.carry - T);
+      var res = { hole: h.hole, par: h.par, strokes: st.strokes, diff: st.strokes - h.par, result: hr.name, result_key: hr.key, ratio: hr.ratio, holed: holed, capped: capped, conceded: evs.length > 1,
+        sp_used: used, sp_mult: m, T: T, shot_damage: st.hole_d, settle: st.hole_s, E: E, carry_in: st.carry, carry_out: carryOut, damage: st.hole_d + E, layout_id: h.layout_id };
+      st.carry = carryOut; st.damage += E; st.hole_damage += E; st.hp -= E;
+      if (st.hp <= 0 && st.killed_at === null) st.killed_at = h.hole;
+      st.holes.push(res); out.hole_result = res;
+      st.i++; st.strokes = 0; st.s = 0; st.lat = 0; st.hole_d = 0; st.hole_s = 0; st.sp_gain = 0;
+      if (st.i >= S.holes.length) { st.done = true; out.finished = true; }
+    }
+    return out;
+  }
+  /** 3홀 종료 결과: 최종 등급 = 피해 비율 등급과 난이도 상한 중 낮은 것 */
+  function chResult(M, S, st) {
+    var ratio = st.damage / S.boss_hp, g = finalRewardGrade(M, ratio, S.zone), by = rewardGradeByRatio(M, ratio);
+    var tot = st.holes.reduce(function (a, x) { return a + x.strokes; }, 0), par = S.holes.reduce(function (a, x) { return a + x.par; }, 0);
+    return { ratio: Math.round(ratio * 1000) / 1000, grade: g.grade, grade_name: g.name, grade_by_ratio: by.name, capped: by.grade > g.grade, zone: S.zone, killed_at: st.killed_at,
+      total_damage: Math.round(st.damage), shot_damage: Math.round(st.shot_damage), hole_damage: Math.round(st.hole_damage), strokes: tot, par: par, diff: tot - par, sp_uses: st.sp_uses };
+  }
+  /** 선택 보상 후보: 철/가죽/천 3개(같은 단계·수량) + 특수 재료 0~1개(4번째 후보). 결과 확정 때 1회 추첨해 저장 */
+  function chCandidates(M, S, grade, seed) {
+    var C = chCfg(M), r = rng('chr:' + seed), T = Math.max(1, Math.min(5, S.tier || 1));
+    var L = T === 1 ? 1 : (r() < C.tierKeep ? T : Math.max(1, T - 1)), qty = C.matQty[grade - 1];
+    var list = C.families.map(function (f) { return { key: f, material_id: 'MAT-' + f + '-' + L, qty: qty }; });
+    var pr = C.special[grade - 1], u = r(), kind = u < pr[0] ? 0 : u < pr[0] + pr[1] ? 1 : u < pr[0] + pr[1] + pr[2] ? 2 : -1;
+    if (kind >= 0 && T >= C.specialNeed[kind]) list.push({ key: 'SPECIAL', material_id: C.specialIds[kind], qty: 1, special: true });
+    return { tier: L, grade: grade, candidates: list };
+  }
+
   return {
     rng: rng, pickWeighted: pickWeighted, index: index,
     characterCp: characterCp, topSkill: topSkill, baseDamage: baseDamage,
@@ -678,7 +905,9 @@ var Engine = (function () {
     setupRound: setupRound, simulateRound: simulateRound, indexAt: indexAt, eventEndMs: eventEndMs, skillAtHole: skillAtHole,
     buildPlan: buildPlan, judgeShot: judgeShot, clubSequence: clubSequence, shotExp: shotExp, accountCp: accountCp,
     holeResult: holeResult, rewardGradeByRatio: rewardGradeByRatio, finalRewardGrade: finalRewardGrade,
-    chestContents: chestContents, chestSpecialRow: chestSpecialRow, tutorialChest: tutorialChest, targetGrade: targetGrade, bal: bal, zoneOf: zoneOf, settingsScore: settingsScore, lookOf: lookOf, lookByCp: lookByCp
+    chestContents: chestContents, chestSpecialRow: chestSpecialRow, tutorialChest: tutorialChest, targetGrade: targetGrade, bal: bal, zoneOf: zoneOf, settingsScore: settingsScore, lookOf: lookOf, lookByCp: lookByCp,
+    ch: { cfg: chCfg, layouts: CH_LAYOUTS, layout: chLayout, geom: chGeom, pos: chPos, xy: chXY, widthAt: chWidthAt, remain: chRemain, judge: chJudge, club: chClub,
+      setup: chSetup, start: chStart, shot: chShot, result: chResult, candidates: chCandidates, W: CHW }
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
