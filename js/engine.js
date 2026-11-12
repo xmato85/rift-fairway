@@ -732,7 +732,7 @@ var Engine = (function () {
     basicPerDay: 2, ticketMax: 10, // 하루 기본 이용 횟수(한국 시간 00:00 초기화·이월 없음), 누적 이용권 보관 한도
     holes: 3, startHoles: [1, 4, 7, 10, 13, 16], tee: { M: 'White', F: 'Red' },
     greenM: 25, aimShort: 8, driverMin: 220, club: { DRIVER: 240, IRON: 160 },
-    reach: [1, 0.95, 0.75, 0.55], cut: [0.12, 0.40, 0.75], angleDeg: 12,
+    reach: [1, 0.95, 0.75, 0.55], cut: [0.05, 0.15, 0.50], angleDeg: 12,
     puttIn: [10, 5, 2, 1], puttLeft: [0.10, 0.20, 0.45, 0.65], latPad: 17, maxMult: 2,
     qual: ['CRIT', 'STRONG', 'NORMAL', 'NORMAL'], qualName: ['완벽한 샷', '좋은 샷', '무난한 샷', '빗맞은 샷'], qualKey: ['NICE SHOT', 'GOOD', 'NOT BAD', 'BAD'],
     holeMult: { eagle: 1.5, birdie: 1.2, par: 1, bogey: 0.8, double: 0.6, triple: 0.4, quad: 0.2, cap: 0.1 },

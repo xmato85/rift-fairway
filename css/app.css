@@ -1093,3 +1093,9 @@ html, body { overscroll-behavior-y: none; }
 @keyframes chspin { to { transform: rotate(360deg); } }
 /* 던전 탭: 스크린 라운드 시작 버튼을 3홀 챌린지 시작 버튼과 같은 좌우 길이로 */
 .dgstart .btn, .dgstart.img .btn { width: auto; align-self: stretch; margin-left: 13px; margin-right: 13px; padding: 12px; }
+
+.chwait { align-items: center; text-align: center; padding: 22px 12px; gap: 10px; }
+
+.chhole b, .chhole span { white-space: nowrap; }
+.chhole em { white-space: nowrap; text-align: right; font-size: 12px; }
+.chhole { gap: 8px; font-size: 14px; }

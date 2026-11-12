@@ -2735,7 +2735,7 @@
     return dgScreen('<div class="row"><b style="font-size:20px">원정 준비</b><span class="simbadge">게임용 가상 샷</span></div>' +
       '<div class="bossbox"><img src="' + bossImg(S0.boss_id) + '" alt="" onerror="this.remove()"><div class="bossname">' + esc(boss.name) + '</div></div>' +
       '<ol class="gsflow"><li><span class="k">코스</span><b>' + esc(S0.course_name) + (reg ? ' <span class="reg">' + esc(reg.name) + '</span>' : '') + '</b></li>' +
-      '<li style="animation-delay:.3s"><span class="k">대상 3홀 (실제 코스 기준)</span><div class="chholes">' + holes + '</div><span class="small">지도는 게임용 레이아웃이에요 · 실제 코스 지도가 아니에요</span></li>' +
+      '<li style="animation-delay:.3s"><span class="k">대상 3홀</span><div class="chholes">' + holes + '</div><span class="small">거리는 실제 코스 기준이고, 지도는 게임용 레이아웃이에요(실제 코스 지도 아님)</span></li>' +
       '<li style="animation-delay:.6s"><span class="k">라운드 설정</span><div class="fv"><span class="rsets">' + Object.keys(rs).map(function (k) { return '<span><i>' + esc(k) + '</i><em>' + esc(rs[k]) + '</em></span>'; }).join('') + '</span></div></li>' +
       '<li style="animation-delay:.9s"><span class="k">난이도</span><b>' + esc(S0.zone) + ' · ' + esc(zone.bossRank) + ' 보스</b><span class="small">점수 ' + S0.diff_score + ' · 보스 HP ' + fmt(S0.boss_hp) + ' · 최고 보상 ' + GRADE_NAME[zone.maxRewardGrade] + '</span></li></ol>' +
       '<div style="flex:1"></div><button class="btn gold" data-a="chGo">티샷 시작</button><button class="small" data-a="chAbortAsk" style="padding:8px">원정 포기 (보상 없음)</button>');
@@ -2778,7 +2778,7 @@
       '<div class="row ch-sub"><button class="small" data-a="chSpeed" id="chSpeed">게이지 속도 · ' + (CHC.speed === 'fast' ? '보통' : '천천히') + '</button><span class="small">' + (CHC.syncErr ? '<button class="small" data-a="chRetry" style="color:var(--bad)">저장 다시 시도</button>' : '가운데에 가까울수록 좋은 샷') + '</span></div></div></div>';
   };
   // 게이지: 실제 경과 시간으로 한쪽 끝→반대쪽 끝(보통 2.4초·천천히 3.2초) 왕복. 입력 전까지 계속, 시간 초과 실패 없음
-  function chPAt(t) { var dur = CHC.speed === 'fast' ? 2400 : 3200, k = ((t - CHC.t0) / dur) % 2; return k > 1 ? 2 - k : k; }
+  function chPAt(t) { var dur = CHC.speed === 'fast' ? 800 : 1070, k = ((t - CHC.t0) / dur) % 2; return k > 1 ? 2 - k : k; }
   function chTick(t) {
     if (CHC.phase !== 'swing') return;
     var p = chPAt(t);
@@ -2904,36 +2904,45 @@
   }
   SCREENS.chResult = function () {
     var S0 = CHC.S, st = CHC.st; if (!S0 || !st || !st.done) return SCREENS.dungeon();
-    var res = (CHC.r && CHC.r.result) || Engine.ch.result(M, S0, st), rw = CHC.r && CHC.r.reward, sel = CHC.r && CHC.r.selected, boss = IX.boss[S0.boss_id], g = res.grade;
+    var res = (CHC.r && CHC.r.result) || Engine.ch.result(M, S0, st), rw = CHC.r && CHC.r.reward, sel = CHC.r && CHC.r.selected, picking = CHC.picking, boss = IX.boss[S0.boss_id], g = res.grade;
+    /* 서버와 같은 계산으로 바로 보여 줌(선택 때 서버가 다시 확인) */
+    if (!rw && CHC.r && CHC.r.round_id && !CHC.syncErr) rw = Engine.ch.candidates(M, S0, res.grade, CHC.r.round_id);
     var rows = st.holes.map(function (x) { return '<div class="crow"><b class="rno hn">' + x.hole + 'H</b><span style="flex:1">PAR ' + x.par + ' · ' + x.strokes + '타 <b class="hr ' + x.result_key + '">' + esc(x.result) + '</b></span><span class="small">피해 ' + fmt(Math.round(x.damage)) + '</span></div>'; }).join('');
     var sc = res.diff === 0 ? '이븐파' : (res.diff > 0 ? '+' : '') + res.diff;
     var cands = '';
-    if (!rw) cands = '<div class="card"><p class="sub">' + (CHC.syncErr ? '저장이 끊겼어요. 연결을 확인하고 다시 시도해 주세요.' : '보상을 확인하고 있어요…') + '</p>' + (CHC.syncErr ? '<button class="btn ghost" data-a="chRetry">다시 시도</button>' : '') + '</div>';
+    if (!rw) cands = '<div class="card chwait">' + (CHC.syncErr ? '<p class="sub">저장이 끊겼어요. 연결을 확인하고 다시 시도해 주세요.</p><button class="btn ghost" data-a="chRetry">다시 시도</button>' : '<div class="chspin"></div><b>보상 결과 선정 중…</b>') + '</div>';
     else {
       cands = '<div class="card g' + g + '" style="border:2px solid var(--gc)"><b class="gname" style="font-size:18px">원정 결과 ' + esc(res.grade_name) + '</b><p class="sub">선택 재료 ' + rw.tier + '단계 · ' + (sel ? '받은 재료는 아래와 같아요' : '아래에서 1개를 선택하세요') + '</p>' +
         '<p class="small">' + (res.capped ? '피해 비율로는 ' + esc(res.grade_by_ratio) + '이지만 난이도 ' + res.zone + ' 구간 최고 등급이 적용됐어요' : '피해 비율 ' + Math.round(res.ratio * 100) + '%로 결정') + '</p>' +
         '<div class="chcands' + (rw.candidates.length > 3 ? ' n4' : '') + '">' + rw.candidates.map(function (c) {
-          var m = IX.material[c.material_id], on = sel === c.key;
-          return '<button class="chcand' + (c.special ? ' sp' : '') + (on ? ' on' : '') + '" data-a="chPick" data-key="' + c.key + '"' + (sel ? ' disabled' : '') + '>' + matIcon(c.material_id) + '<b>' + esc(m ? m.name : c.material_id) + '</b><span>×' + c.qty + (c.special ? ' · 특수' : '') + '</span></button>';
-        }).join('') + '</div>' + (sel ? '' : '<p class="small">특수 재료를 고르면 이번 기본 재료는 받지 않아요. 선택은 한 번만 할 수 있어요.</p>') + '</div>';
+          var m = IX.material[c.material_id], on = (sel || picking) === c.key;
+          return '<button class="chcand' + (c.special ? ' sp' : '') + (on ? ' on' : '') + '" data-a="chPick" data-key="' + c.key + '"' + (sel || picking ? ' disabled' : '') + '>' + matIcon(c.material_id) + '<b>' + esc(m ? m.name : c.material_id) + '</b><span>×' + c.qty + (c.special ? ' · 특수' : '') + '</span></button>';
+        }).join('') + '</div>' + (picking ? '<p class="small"><b>재료를 받는 중…</b></p>' : sel ? '' : '<p class="small">' + (rw.candidates.some(function (x) { return x.special; }) ? '특수 재료를 고르면 이번 기본 재료는 받지 않아요. ' : '') + '선택은 한 번만 할 수 있어요.</p>') + '</div>';
     }
     return dgScreen('<b style="font-size:20px">3홀 챌린지 결과</b>' +
       '<div class="card"><div class="row"><b style="color:' + (res.killed_at ? 'var(--ok)' : 'var(--bad)') + '">' + (res.killed_at ? '보스 처치 · ' + res.killed_at + 'H' : '보스 생존') + '</b><span>' + esc(boss.name) + '</span></div>' +
-      '<p class="sub">합계 ' + res.strokes + '타 (PAR ' + res.par + ' · ' + sc + ') · 피해 ' + fmt(res.total_damage) + ' · 피해 비율 ' + Math.round(res.ratio * 100) + '%</p>' +
+      '<p class="sub">합계 ' + res.strokes + '타 (PAR ' + res.par + ' · ' + sc + ')</p><p class="sub">총 피해 ' + fmt(res.total_damage) + ' · 피해 비율 ' + Math.round(res.ratio * 100) + '%</p>' +
       '<div class="small">' + esc(S0.course_name) + ' · ' + S0.start_hole + '~' + (S0.start_hole + 2) + 'H</div>' + rows + '</div>' + cands +
       '<button class="small" data-a="chProbs" style="padding:8px">확률 보기</button>' +
       (sel ? '<button class="btn gold" data-a="chDone">던전으로</button>' : '') + '<button class="btn ghost" data-a="chLink">GS 레이드 소개 보기</button>');
   };
+  // 재료를 누르면 먼저 확인 팝업 → [받기]를 눌러야 확정. 확정 뒤에는 '받는 중…'을 보여 주고 서버 응답을 기다림
   A.chPick = function (d) {
-    if (CHC.busyPick || !CHC.r || CHC.r.selected) return; CHC.busyPick = true;
-    var key = d.key, c = CHC.r.reward.candidates.filter(function (x) { return x.key === key; })[0];
-    act('challengeChooseReward', { round_id: CHC.r.round_id, key: key }).then(function (res) {
-      CHC.busyPick = false;
-      if (!res.ok) { toast(res.error.message); if (res.error.round) { CHC.r = res.error.round; render(); } return; }
+    if (CHC.busyPick || CHC.picking || !CHC.r || CHC.r.selected) return;
+    var res = CHC.r.result || Engine.ch.result(M, CHC.S, CHC.st), rw = CHC.r.reward || Engine.ch.candidates(M, CHC.S, res.grade, CHC.r.round_id);
+    var c = rw.candidates.filter(function (x) { return x.key === d.key; })[0]; if (!c) return;
+    var m = IX.material[c.material_id];
+    popup = { type: 'confirm', title: '이 재료를 받을까요?', text: (m ? m.name : '재료') + ' ×' + c.qty + (c.special ? ' (특수 재료 · 이번 기본 재료는 받지 않아요)' : '') + ' · 선택하면 바꿀 수 없어요.', yes: '받기', no: '다시 고르기', run: function () { chPickGo(c); } }; render();
+  };
+  function chPickGo(c) {
+    CHC.busyPick = true; CHC.picking = c.key; render();
+    act('challengeChooseReward', { round_id: CHC.r.round_id, key: c.key }).then(function (res) {
+      CHC.busyPick = false; CHC.picking = null;
+      if (!res.ok) { toast(res.error.message); if (res.error.round) CHC.r = res.error.round; render(); return; }
       CHC.r = res.data.round; S.materials = res.data.materials; S.wallet = res.data.wallet; S.challenge = null;
       var m = IX.material[c.material_id]; toast((m ? m.name : '재료') + ' ' + c.qty + '개를 받았어요'); render();
     });
-  };
+  }
   POPUPS.chProbs = function () { return '<div class="overlay center"><div class="sheet"><b style="font-size:18px">3홀 챌린지 확률 안내</b>' + chProbText() + '<button class="btn ghost" data-a="close">닫기</button></div></div>'; };
   A.chProbs = function () { popup = { type: 'chProbs' }; render(); };
   A.chDone = function () { go('dungeon'); };
