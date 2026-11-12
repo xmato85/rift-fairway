@@ -798,11 +798,12 @@ var Engine = (function () {
   function chSetup(M, o) {
     var C = chCfg(M), ix = index(M), r = rng('chs:' + o.seed), tee = o.gender === 'F' ? C.tee.F : C.tee.M;
     var sh = o.startHole || C.startHoles[Math.floor(r() * C.startHoles.length)];
-    var okHole = function (c, h) { var par = c.par[h - 1], d = c.tees && c.tees[tee] && c.tees[tee][h - 1]; return par >= 3 && par <= 6 && d > 0; };
+    var teeOf = function (c) { return c.tees && (c.tees[tee] || c.tees.White); }; // 옛 캐시 등으로 해당 티 거리가 없으면 White로 대체
+    var okHole = function (c, h) { var par = c.par[h - 1], d = teeOf(c) && teeOf(c)[h - 1]; return par >= 3 && par <= 6 && d > 0; };
     var cands = M.raidCourses.filter(function (c) { for (var k = 0; k < C.holes; k++) if (!okHole(c, sh + k)) return false; return true; });
     var course = o.courseId ? ix.raidCourse[o.courseId] : pickWeighted(r, cands, function (c) { return c.weight || 1; });
     var pars = [], dists = [];
-    for (var k = 0; k < C.holes; k++) { pars.push(course.par[sh + k - 1]); dists.push(course.tees[tee][sh + k - 1]); }
+    for (var k = 0; k < C.holes; k++) { pars.push(course.par[sh + k - 1]); dists.push(teeOf(course)[sh + k - 1]); }
     var lays = chPickLayouts(r, pars, o.prevByPar);
     var room = {}, mode = pickWeighted(r, M.settingOptions.filter(function (x) { return x.scope === 'ROOM' && x.item === '게임방식'; }), function (x) { return x.weight; });
     room['게임방식'] = mode.option;

@@ -1082,3 +1082,14 @@ body, .scroll, .sheet, .cbubble, .iln, .card, button { word-break: keep-all; ove
 /* 위로 당겨 새로고침·스크롤 끝 튕김 방지(스크롤하다 새로고침되는 문제) */
 html, body, #app, .scroll, .sheet { overscroll-behavior-y: contain; }
 html, body { overscroll-behavior-y: none; }
+
+/* 3홀 챌린지 연습 버튼 강조(아직 연습 안 한 유저) + 로딩 */
+.chglow { position: relative; margin: 8px 0 2px; background: #2f6b4a; color: #fff; border: 1px solid #E2C46A; animation: chglow 1.6s ease-in-out infinite; }
+.chglow .chnew { background: #E2C46A; color: #2b2208; font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: 8px; margin-right: 6px; }
+.chip.chglow { animation: chglow 1.6s ease-in-out infinite; margin: 0; }
+@keyframes chglow { 0%, 100% { box-shadow: 0 0 0 0 #E2C46A00, 0 0 6px #E2C46A55; transform: scale(1); } 50% { box-shadow: 0 0 0 5px #E2C46A33, 0 0 18px #E2C46Aaa; transform: scale(1.03); } }
+.chload { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 55vh; text-align: center; }
+.chspin { width: 34px; height: 34px; border-radius: 50%; border: 4px solid #E2C46A44; border-top-color: #E2C46A; animation: chspin .8s linear infinite; }
+@keyframes chspin { to { transform: rotate(360deg); } }
+/* 던전 탭: 스크린 라운드 시작 버튼을 3홀 챌린지 시작 버튼과 같은 좌우 길이로 */
+.dgstart .btn, .dgstart.img .btn { width: auto; align-self: stretch; margin-left: 13px; margin-right: 13px; padding: 12px; }

@@ -826,7 +826,9 @@
     tutDone: function (p) {
       return '<div class="overlay center"><div class="sheet" style="align-items:center;text-align:center">' + face('pino_cheer') + '<b style="font-size:20px">튜토리얼 완료!</b>' +
         (p.gold ? '<p>완료 보상 <b>' + fmt(p.gold) + 'G</b>를 받았어요</p>' : '') +
-        '<p class="sub">사냥 → 제작 → 장착으로 전투력을 키워요. 특수 재료는 던전 탭의 레이드에서 얻어요.</p><button class="btn" data-a="close">확인</button></div></div>';
+        '<p class="sub">사냥 → 제작 → 장착으로 전투력을 키워요. 특수 재료는 던전 탭의 레이드에서 얻어요.</p>' +
+        '<div class="card" style="text-align:left"><b>던전 탭 · 3홀 챌린지</b><p class="small">스크린 라운드 없이도 내 샷으로 보스를 공격해요. 하루 2번 무료, 약 3~5분이면 끝나고 재료를 골라 받아요. 연습 3샷으로 먼저 익혀 보세요.</p></div>' +
+        '<button class="btn gold" data-a="tutToCh">3홀 챌린지 보러 가기</button><button class="small" data-a="close" style="padding:8px">나중에</button></div></div>';
     },
     expired: function (p) {
       return '<div class="overlay center"><div class="sheet"><b>세션 종료</b><p class="sub">' + esc(p.msg) + '</p><button class="btn" data-a="logout">다시 로그인</button></div></div>';
@@ -1041,6 +1043,7 @@
     rehunt: function (d) { popup = null; startHunt(d.v); },
     confirmYes: function () { var f = popup && popup.run; popup = null; render(); if (f) f(); },
     close: function () { popup = null; render(); },
+    tutToCh: function () { popup = null; go('dungeon'); },
     togglePanel: function () { huntPanelOpen = !huntPanelOpen; render(); },
     goCraftGoal: function (d) { go('craft', { job: IX.item[d.v].jobId }); popup = { type: 'craftDetail', id: d.v }; render(); },
     goalCard: function () {
@@ -2649,22 +2652,30 @@
     var cn = chChancesNow(), noChance = !cn.unlimited && cn.left <= 0 && cn.tickets <= 0;
     var c = S.challenge, txt = c ? (c.status === 'RESULT' ? '지난 원정의 보상을 선택해 주세요' : '진행 중인 원정이 있어요 · 이어서 칠 수 있어요') : noChance ? '오늘 기본 ' + cn.total + '회 완료 · 일일 미션 올클리어로 이용권 +1' : chChanceText(cn) + ' · 연속 3홀 약 3~5분',
       btn = c ? (c.status === 'RESULT' ? '보상 선택하기' : '이어 하기') : noChance ? '일일 미션 보기' : cn.left <= 0 && !cn.unlimited ? '이용권 1장으로 시작' : '3홀 챌린지 시작', act0 = noChance && !c ? 'missions' : 'chOpen';
-    return '<div class="card chcard">' + (APP_CONFIG.CH_IMAGES ? '<img class="chbanner" src="' + asset('ch_banner.png') + '" alt="">' : '') + '<div class="row" style="justify-content:flex-start;gap:12px">' + (APP_CONFIG.CH_IMAGES ? '' : '<div class="chico">' + chGolfer(S.member.gender === 'F' ? 'F' : 'M', 'DRIVER', 'impact') + '</div>') + '<div style="flex:1"><b style="font-size:17px">3홀 챌린지</b><p class="sub">내 손끝의 샷이 캐릭터의 공격으로!</p><p class="small">' + txt + '</p>' + (!c && !chSeen() ? '<p class="small"><b style="color:var(--gold,#d9a441)">오늘 할 일</b> · 연습 3샷으로 방법 익히기 <button class="chip" data-a="chPractice">연습하기</button></p>' : '') + '</div></div>' +
+    return '<div class="card chcard">' + (APP_CONFIG.CH_IMAGES ? '<img class="chbanner" src="' + asset('ch_banner.png') + '" alt="">' : '') + '<div class="row" style="justify-content:flex-start;gap:12px">' + (APP_CONFIG.CH_IMAGES ? '' : '<div class="chico">' + chGolfer(S.member.gender === 'F' ? 'F' : 'M', 'DRIVER', 'impact') + '</div>') + '<div style="flex:1"><b style="font-size:17px">3홀 챌린지</b><p class="sub">내 손끝의 샷이 캐릭터의 공격으로!</p><p class="small">' + txt + '</p>' + (!c && !chSeen() ? '<button class="btn chglow" data-a="chPractice"><span class="chnew">NEW</span> 3홀 연습 3샷 · 먼저 해보기</button>' : '') + '</div></div>' +
       '<button class="btn gold" data-a="' + act0 + '">' + btn + '</button></div>';
   }
   var _dungeonCh = SCREENS.dungeon;
   SCREENS.dungeon = function (p) {
     var html = _dungeonCh(p), mark = '<span class="simbadge">체험 레이드</span></div>', k = html.indexOf(mark);
+    if (!chSeen() && html.indexOf('<div class="scroll">') >= 0) return html.replace('<div class="scroll">', '<div class="scroll">' + chCardHtml());
     if (k >= 0) return html.slice(0, k + mark.length) + chCardHtml() + html.slice(k + mark.length);
     return html.replace('<div class="scroll">', '<div class="scroll">' + chCardHtml());
   };
+  // 누르면 화면부터 바꾸고(진행 중 원정이 있으면 '라운드로 이동 중' 안내) 서버 확인은 뒤에서
+  SCREENS.chLoad = function () {
+    return dgScreen('<div class="chload"><div class="chspin"></div><b>' + esc(CHC.loadText || '라운드하러 가는 중…') + '</b><p class="small">잠시만 기다려 주세요</p></div>');
+  };
   A.chOpen = function () {
     if (CHC.loading) return; CHC.loading = true;
+    var resume = !!S.challenge;
+    CHC.loadText = '라운드하러 가는 중…'; go(resume ? 'chLoad' : 'chIntro');
     Api.call('challengeStatus', {}, { read: true }).then(function (res) {
       CHC.loading = false;
-      if (!res.ok) { toast(res.error.message); return; }
+      if (!res.ok) { toast(res.error.message); if (view.name === 'chLoad') go('dungeon'); return; }
       if (res.data.chances) S.chances = res.data.chances;
-      if (res.data.round) chEnter(res.data.round); else go('chIntro');
+      if (res.data.round) { if (view.name === 'chLoad' || view.name === 'chIntro') chEnter(res.data.round); }
+      else if (view.name === 'chLoad') go('chIntro'); else if (view.name === 'chIntro') render();
     });
   };
   // ---- 연습 3샷(첫 이용 안내): 서버 저장·횟수 차감·보상·미션 없음, 한 홀만 ----
@@ -2696,7 +2707,7 @@
       '<p class="sub" style="text-align:center">내 손끝의 샷이 캐릭터의 공격으로!</p>' +
       '<ol class="gsflow"><li><span class="k">1</span><b>가운데에 맞춰 임팩트</b></li><li style="animation-delay:.3s"><span class="k">2</span><b>내 캐릭터가 보스를 공격</b></li><li style="animation-delay:.6s"><span class="k">3</span><b>원하는 재료를 골라 받기</b></li></ol>' +
       '<p class="small">연속 3홀 · 약 3~5분 · 제한시간 없음 · 실제 GS 라운드 기록과는 별개예요</p>' +
-      '<div class="card"' + (chSeen() ? '' : ' style="border-color:var(--gold,#d9a441)"') + '><div class="row"><b>' + (chSeen() ? '연습해 보기' : '처음이라면 연습 3샷부터') + '</b><button class="chip' + (chSeen() ? '' : ' on') + '" data-a="chPractice">연습하기</button></div><p class="small">한 홀만 3샷 · 횟수·보상·미션과 무관해요</p></div>' +
+      '<div class="card"' + (chSeen() ? '' : ' style="border-color:var(--gold,#d9a441)"') + '><div class="row"><b>' + (chSeen() ? '연습해 보기' : '처음이라면 연습 3샷부터') + '</b><button class="chip' + (chSeen() ? '' : ' on chglow') + '" data-a="chPractice">연습하기</button></div><p class="small">한 홀만 3샷 · 횟수·보상·미션과 무관해요</p></div>' +
       '<div class="card"><div class="row"><b>' + chChanceText(chChancesNow()) + '</b><span class="small">이용권 최대 ' + chChancesNow().max + '장</span></div><p class="small">매일 00:00(한국 시간)에 기본 2회가 새로 생겨요. 기본을 다 쓰면 이용권이 1장씩 쓰이고, 이용권은 일일 미션 올클리어로 받아요.</p></div>' +
       '<div style="flex:1"></div>' + (function () { var cn = chChancesNow(), none = !cn.unlimited && cn.left <= 0 && cn.tickets <= 0; return none ? '<button class="btn gold" data-a="missions">일일 미션 보기</button>' : '<button class="btn gold" data-a="chStart"' + (CHC.loading ? ' disabled' : '') + '>' + (CHC.loading ? '준비 중…' : cn.left <= 0 && !cn.unlimited ? '이용권 1장으로 시작' : '3홀 시작') + '</button>'; })());
   };
@@ -2707,12 +2718,13 @@
     chDoStart();
   };
   function chDoStart() {
-    if (CHC.loading) return; CHC.loading = true; render();
+    if (CHC.loading) return; CHC.loading = true; CHC.loadText = '라운드하러 가는 중…'; go('chLoad');
     act('challengeStart', {}).then(function (res) {
       CHC.loading = false;
+      var back = function () { if (view.name === 'chLoad') go('chIntro'); else render(); };
       if (res.ok && res.data.chances) S.chances = res.data.chances;
-      if (!res.ok && res.error.chances) { S.chances = res.error.chances; toast(res.error.message); render(); return; }
-      if (!res.ok) { if (res.error.round) { toast(res.error.message); chEnter(res.error.round); return; } toast(res.error.message); render(); return; }
+      if (!res.ok && res.error.chances) { S.chances = res.error.chances; toast(res.error.message); back(); return; }
+      if (!res.ok) { if (res.error.round) { toast(res.error.message); chEnter(res.error.round); return; } toast(res.error.message + (res.error.code ? ' (' + res.error.code + ')' : '')); back(); return; }
       chEnter(res.data.round);
     });
   };
