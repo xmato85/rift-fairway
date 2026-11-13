@@ -2789,7 +2789,7 @@
   A.chBtn = function () {
     if (CHC.phase === 'ready') {
       if (CHC.syncErr) { A.chRetry(); return; }
-      if (CHC.unsent.length > 1) { toast('저장 중이에요. 잠시만요'); return; }
+      if (CHC.unsent.length >= CH_MAX_PENDING) { toast('저장이 밀려 있어요. 잠시만요'); return; }
       CHC.phase = 'swing'; CHC.pose = 'back'; CHC.t0 = performance.now(); chPose(); var b = document.getElementById('chBtn'); if (b) b.textContent = '임팩트!';
       CHC.raf = requestAnimationFrame(chTick);
     } else if (CHC.phase === 'swing') chImpact();
@@ -2855,24 +2855,45 @@
   A.chExit = function () {
     popup = { type: 'confirm', title: CHC.practice ? '연습을 그만할까요?' : '원정에서 나갈까요?', text: CHC.practice ? '연습은 횟수·보상에 영향이 없어요. 언제든 다시 할 수 있어요.' : '지금까지 친 샷은 저장돼요. 나중에 이어서 할 수 있어요.', yes: '나가기', no: '계속하기', run: function () { cancelAnimationFrame(CHC.raf); CHC.phase = 'ready'; if (CHC.practice) chPracticeLeave(); go('dungeon'); } }; render();
   };
-  // ---- 서버 저장(뒤에서 차례로). 연결이 끊기면 다음 샷을 막고 재시도를 안내 ----
+  // ---- 서버 저장(뒤에서 차례로) ----
+  // 밀린 샷은 한 번에 묶어 보낸다(느릴수록 묶음이 커져 서버 부담이 스스로 줄어듦). 일시적인 오류(느림·BUSY·연결 끊김)는 조용히 자동 재시도하고,
+  // 4번 연속 실패해야 '저장 실패'를 보여 준다. 샷은 화면이 먼저 반영하고 서버는 shot_no로 중복을 막으므로 몇 샷이 밀려도 안전하다.
+  var CH_BATCH = 8, CH_MAX_PENDING = 8;
+  function chRetryLater() {
+    CHC.fails = (CHC.fails || 0) + 1;
+    if (CHC.fails >= 4) {
+      CHC.syncErr = true; var sv0 = document.getElementById('chSave');
+      if (view.name === 'chPlay' && CHC.phase === 'ready') render(); else if (sv0) { sv0.textContent = '저장 실패'; sv0.className = 'save err'; }
+      return;
+    }
+    clearTimeout(CHC.retryT); CHC.retryT = setTimeout(chFlush, Math.min(8000, 1000 * Math.pow(2, CHC.fails - 1)));
+  }
   function chFlush() {
     if (CHC.practice) { CHC.unsent = []; return; } // 연습: 서버 저장 없음
     if (CHC.flushing || !CHC.unsent.length || !CHC.r) return;
     CHC.flushing = true;
-    var it = CHC.unsent[0];
-    Api.call('challengeShot', { round_id: CHC.r.round_id, shot_no: it.n, p: it.p }, { read: true }).then(function (res) {
+    var rid = CHC.r.round_id, batch = CHC.noBatch ? CHC.unsent.slice(0, 1) : CHC.unsent.slice(0, CH_BATCH);
+    var call = CHC.noBatch ? Api.call('challengeShot', { round_id: rid, shot_no: batch[0].n, p: batch[0].p }, { read: true })
+      : Api.call('challengeShots', { round_id: rid, shots: batch.map(function (x) { return { n: x.n, p: x.p }; }) }, { read: true });
+    // 응답이 30초 넘게 안 오면(서버 혼잡) 끊긴 것으로 보고 다시 보낸다. 샷은 shot_no로 중복이 막혀 있어 같은 샷을 다시 보내도 안전하다
+    var settled = false, tmo = setTimeout(function () { if (settled) return; settled = true; CHC.flushing = false; chRetryLater(); }, 30000);
+    call.then(function (res) {
+      if (settled) return; settled = true; clearTimeout(tmo);
       CHC.flushing = false;
+      if (!CHC.r || CHC.r.round_id !== rid) return; // 그 사이 다른 원정으로 바뀜
       var sv = document.getElementById('chSave');
       if (!res.ok) {
         var c = res.error.code;
-        if (c === 'NETWORK' || c === 'SERVER_ERROR' || c === 'BUSY') { CHC.syncErr = true; if (view.name === 'chPlay' && CHC.phase === 'ready') render(); else if (sv) { sv.textContent = '저장 실패'; sv.className = 'save err'; } return; }
+        if (c === 'BAD_REQUEST' && /알 수 없는/.test(res.error.message || '') && !CHC.noBatch) { CHC.noBatch = true; chFlush(); return; } // 서버가 아직 묶음 전송을 모르는 옛 버전이면 한 샷씩
+        if (c === 'NETWORK' || c === 'SERVER_ERROR' || c === 'BUSY') { chRetryLater(); return; }
         if (c === 'SESSION_EXPIRED') return;
         if (res.error.round) { toast('서버 기준으로 맞췄어요'); chAdopt(res.error.round); go(res.error.round.status === 'ACTIVE' ? 'chPlay' : 'chResult'); return; }
         toast(res.error.message); CHC.unsent = []; return;
       }
-      CHC.unsent.shift(); CHC.syncErr = false;
+      CHC.fails = 0; CHC.syncErr = false;
       var rd = res.data.round, n = rd.state.n_shot;
+      CHC.unsent = CHC.unsent.filter(function (x) { return x.n >= n; }); // 서버가 반영한 샷은 뺌
+      if (CHC.unsent.length && CHC.unsent[0].n !== n) { toast('서버 기준으로 맞췄어요'); chAdopt(rd); go(rd.status === 'ACTIVE' ? 'chPlay' : 'chResult'); return; } // 샷 순서가 어긋남 → 서버가 기준
       if (CHC.hist[n] && CHC.hist[n] !== JSON.stringify(rd.state)) { // 서버 값이 기준
         if (window.console) console.warn('challenge state mismatch at shot ' + n);
         if (!CHC.unsent.length && CHC.phase === 'ready') { chAdopt(rd); if (view.name === 'chPlay') render(); return; }
@@ -2883,7 +2904,7 @@
       if (CHC.unsent.length) chFlush(); else if (view.name === 'chResult') render();
     });
   }
-  A.chRetry = function () { CHC.syncErr = false; if (view.name === 'chPlay') render(); chFlush(); };
+  A.chRetry = function () { CHC.syncErr = false; CHC.fails = 0; if (view.name === 'chPlay') render(); chFlush(); };
   // 숨김 기능 계정(회원DB '숨김 기능' = Y)만: 우측 상단 3연속 터치 → 남은 샷을 모두 완벽한 샷으로 확정(시연용). 서버에서도 검사
   A.chHidden = function () {
     var t = Date.now(); CHC.taps = CHC.taps.filter(function (x) { return t - x < 1500; }); CHC.taps.push(t);
