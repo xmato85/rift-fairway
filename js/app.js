@@ -1975,7 +1975,7 @@
   var FEV = {};
   function euro(w) { var c = String(w).charCodeAt(String(w).length - 1) - 0xAC00, b = c >= 0 && c <= 11171 ? c % 28 : 0; return w + (b && b !== 8 ? '으로' : '로'); }
   /** 퍼널 이벤트(같은 접속에서 1회) → L_GAME_LOG → 기획 시트 FUNNEL 탭 */
-  function fev(name, extra) { if (FEV[name]) return; FEV[name] = 1; act('logEvent', Object.assign({ event_type: name }, extra || {})); }
+  function fev(name, extra) { if (FEV[name] || APP_CONFIG.LOG_EVENTS === false) return; FEV[name] = 1; act('logEvent', Object.assign({ event_type: name }, extra || {})); }
 
   /** 던전 체험 뒤 3부위: 아직 일반 이상을 장착하지 않은 첫 부위 */
   function tutMissingPart() {
